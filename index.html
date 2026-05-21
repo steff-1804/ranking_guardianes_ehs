@@ -47,7 +47,38 @@ function calculate(){let monthly=aggregateTeamMonth(uploadedRows),months=selecte
 function render(data,target){let ranking=$("ranking");ranking.innerHTML="";let raceMax=Math.max(1,target);data.forEach((team,i)=>{let progress=Math.max(0,Math.min(100,((team.points||0)/raceMax)*100)),left=Math.max(6,Math.min(86,progress*.86));let row=document.createElement("article");row.className="row";row.innerHTML=`<div class="pos">${i+1}</div><div class="logo"><img src="${team.logo}" alt="${team.name}" onerror="this.style.display='none'"></div><div class="track"><div class="fill" style="width:${progress}%"></div><img class="runner" src="${team.logo}" alt="${team.name}" style="left:${left}%" onerror="this.style.display='none'"><span class="name">${team.name}</span><div class="finish"></div></div><div class="score">${fmt(team.points||0)}</div><div class="target">${fmt(target)}</div>`;ranking.appendChild(row)})}
 function drawGauge(value,maxValue){let canvas=$("gaugeCanvas"),ctx=canvas.getContext("2d"),w=canvas.width,h=canvas.height;ctx.clearRect(0,0,w,h);let cx=w/2,cy=h-25,rx=w*.42,ry=h*.78,pct=Math.max(0,Math.min(1,maxValue>0?value/maxValue:0));function band(a,b,orx,ory,irx,iry,color){let start=Math.PI-Math.PI*a/100,end=Math.PI-Math.PI*b/100;ctx.beginPath();for(let i=0;i<=90;i++){let ang=start+(end-start)*i/90,x=cx+Math.cos(ang)*orx,y=cy-Math.sin(ang)*ory;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)}for(let i=90;i>=0;i--){let ang=start+(end-start)*i/90,x=cx+Math.cos(ang)*irx,y=cy-Math.sin(ang)*iry;ctx.lineTo(x,y)}ctx.closePath();ctx.fillStyle=color;ctx.fill()}band(0,100,rx+25,ry+25,rx-125,ry-82,"#dce1e8");ctx.strokeStyle="#4a5563";ctx.lineWidth=5;ctx.stroke();band(0,58,rx,ry,rx-90,ry-55,"#159844");band(58,82,rx,ry,rx-90,ry-55,"#d6c92b");band(82,100,rx,ry,rx-90,ry-55,"#c12a23");for(let i=0;i<=100;i+=2){let a=Math.PI-Math.PI*i/100,maj=i%10===0,x1=cx+Math.cos(a)*(rx-8),y1=cy-Math.sin(a)*(ry-8),x2=cx+Math.cos(a)*(rx-(maj?42:27)),y2=cy-Math.sin(a)*(ry-(maj?30:19));ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.strokeStyle="rgba(15,23,42,.82)";ctx.lineWidth=maj?3:1.2;ctx.stroke()}[{text:"0",p:10},{text:String(Math.round(maxValue/2)),p:50},{text:String(maxValue),p:90}].forEach(l=>{let a=Math.PI-Math.PI*l.p/100,x=cx+Math.cos(a)*(rx-130),y=cy-Math.sin(a)*(ry-80);ctx.fillStyle="#111827";ctx.font="900 34px Arial";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(l.text,x,y)});ctx.fillStyle="#111827";ctx.font="900 56px Arial";ctx.textAlign="center";ctx.fillText(fmt(value),cx,cy-95);let na=Math.PI-Math.PI*pct,nx=cx+Math.cos(na)*(rx-75),ny=cy-Math.sin(na)*(ry-50);ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(nx,ny);ctx.strokeStyle="#d22121";ctx.lineWidth=9;ctx.lineCap="round";ctx.stroke();ctx.beginPath();ctx.arc(cx,cy,18,0,Math.PI*2);ctx.fillStyle="#27364a";ctx.fill();ctx.strokeStyle="#e5e7eb";ctx.lineWidth=4;ctx.stroke()}
 function update(){let res=calculate(),data=res.ranking,target=res.target||POINTS_PER_MONTH,leader=data[0]||{name:"-",points:0},percent=target>0?Math.min(100,leader.points/target*100):0;render(data,target);$("kpiMonths").textContent=res.months.length;$("kpiTarget").textContent=fmt(target);$("kpiLeader").textContent=leader.points>0?leader.name:"-";$("kpiLeaderPoints").textContent=fmt(leader.points||0);$("kpiPercent").textContent=percent.toFixed(1)+"%";drawGauge(leader.points||0,target);$("status").innerHTML=uploadedRows.length?`Registros detectados: <b>${uploadedRows.length}</b>. Meses usados: <b>${res.months.join(", ")||"sin mes"}</b>. Meta calculada: <b>${fmt(target)}</b> puntos.`:`<span class="warn">No hay datos cargados. Sube los Excel de los equipos.</span>`;console.log("Meses seleccionados:",res.months);console.table(res.monthly)}
-$("fileInput").addEventListener("change",async e=>{uploadedRows=[];let files=Array.from(e.target.files||[]);if(files.length>8)$("status").innerHTML=`<span class="warn">Subiste ${files.length} archivos. Se recomienda máximo 8, uno por equipo.</span>`;for(let file of files){try{let rows=await readFile(file);uploadedRows.push(...rows)}catch(err){console.error("Error leyendo archivo:",file.name,err);$("status").innerHTML=`<span class="warn">No se pudo leer ${file.name}. Revisa la consola.</span>`}}update()});$("btnUpdate").addEventListener("click",update);$("monthMode").addEventListener("change",update);render(TEAMS.map(t=>({...t,points:0,target:POINTS_PER_MONTH})),POINTS_PER_MONTH);drawGauge(0,POINTS_PER_MONTH);
+const loadedFiles=new Set();
+$("fileInput").addEventListener("change",async e=>{
+  let files=Array.from(e.target.files||[]);
+  if(files.length===0)return;
+
+  for(let file of files){
+    const fileKey=`${file.name}_${file.size}_${file.lastModified}`;
+
+    if(loadedFiles.has(fileKey)){
+      console.warn("Archivo repetido, no se vuelve a cargar:",file.name);
+      continue;
+    }
+
+    try{
+      let rows=await readFile(file);
+      uploadedRows.push(...rows);
+      loadedFiles.add(fileKey);
+    }catch(err){
+      console.error("Error leyendo archivo:",file.name,err);
+      $("status").innerHTML=`<span class="warn">No se pudo leer ${file.name}. Revisa la consola.</span>`;
+    }
+  }
+
+  if(loadedFiles.size>8){
+    $("status").innerHTML=`<span class="warn">Has cargado ${loadedFiles.size} archivos. Se recomienda máximo 8, uno por equipo.</span>`;
+  }
+
+  update();
+
+  // Permite volver a seleccionar el mismo archivo si necesitas recargarlo.
+  e.target.value="";
+});$("btnUpdate").addEventListener("click",update);$("monthMode").addEventListener("change",update);render(TEAMS.map(t=>({...t,points:0,target:POINTS_PER_MONTH})),POINTS_PER_MONTH);drawGauge(0,POINTS_PER_MONTH);
 </script>
 </body>
 </html>

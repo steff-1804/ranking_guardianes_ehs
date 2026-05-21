@@ -1,9 +1,13 @@
-<!DOCTYPE html>
+from pathlib import Path
+
+html = r"""<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Guardianes EHS - Ranking</title>
+  <title>Guardianes EHS - Ranking Carrera</title>
+
+  <!-- Librería para leer Excel y CSV. Necesita internet en GitHub Pages. -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <style>
@@ -31,7 +35,7 @@
     }
 
     .board{
-      width:min(980px,100%);
+      width:min(1050px,100%);
       background:linear-gradient(180deg,#101f36,#071120);
       border:5px solid #6f7a89;
       border-radius:10px;
@@ -82,7 +86,7 @@
     }
 
     .gauge-frame{
-      width:min(700px,100%);
+      width:min(740px,100%);
       margin:16px auto 12px;
       padding:10px;
       background:linear-gradient(180deg,#aeb8c4,#536170 48%,#1b2838 49%,#0d1726);
@@ -92,7 +96,7 @@
     }
 
     .gauge-box{
-      height:220px;
+      height:225px;
       background:linear-gradient(180deg,#eff2f6,#c8ced6);
       border:3px solid #3f4954;
       border-radius:6px;
@@ -106,7 +110,7 @@
     }
 
     .upload-bar{
-      width:min(820px,100%);
+      width:min(900px,100%);
       margin:10px auto 14px;
       padding:10px;
       display:flex;
@@ -119,7 +123,7 @@
       border-radius:5px;
     }
 
-    input[type="file"]{ max-width:330px; color:white; }
+    input[type="file"]{ max-width:390px; color:white; }
 
     select, button{
       border:0;
@@ -132,7 +136,7 @@
     select{
       background:#edf1f7;
       color:#0b1220;
-      min-width:190px;
+      min-width:205px;
     }
 
     button{
@@ -142,9 +146,18 @@
       cursor:pointer;
     }
 
+    .note{
+      width:min(900px,100%);
+      margin:0 auto 12px;
+      color:#dbe5f4;
+      font-size:14px;
+      text-align:center;
+      opacity:.92;
+    }
+
     .indicators{
       display:grid;
-      grid-template-columns:repeat(4,1fr);
+      grid-template-columns:repeat(5,1fr);
       gap:10px;
       margin:12px 0 18px;
     }
@@ -162,8 +175,8 @@
     .indicator-card span{
       display:block;
       color:#dce5f3;
-      font-size:13px;
-      letter-spacing:1.2px;
+      font-size:12px;
+      letter-spacing:1px;
       text-transform:uppercase;
       margin-bottom:5px;
     }
@@ -171,7 +184,7 @@
     .indicator-card strong{
       display:block;
       color:#ffe27a;
-      font-size:clamp(20px,3vw,28px);
+      font-size:clamp(18px,2.8vw,28px);
       text-shadow:0 2px 0 #000;
       white-space:nowrap;
       overflow:hidden;
@@ -285,7 +298,7 @@
       z-index:2;
       font-size:clamp(15px,2.2vw,24px);
       font-weight:900;
-      letter-spacing:4px;
+      letter-spacing:3px;
       white-space:nowrap;
       overflow:hidden;
       text-overflow:ellipsis;
@@ -300,7 +313,7 @@
       display:flex;
       align-items:center;
       justify-content:center;
-      font-size:24px;
+      font-size:22px;
       font-weight:900;
     }
 
@@ -313,7 +326,7 @@
       display:flex;
       align-items:center;
       justify-content:center;
-      font-size:24px;
+      font-size:22px;
       font-weight:900;
       box-shadow:inset 0 2px 8px rgba(255,255,255,.55);
     }
@@ -354,7 +367,7 @@
       font-weight:800;
     }
 
-    @media(max-width:760px){
+    @media(max-width:800px){
       body{padding:8px;}
       .board{padding:10px;}
       .title-panel h1{letter-spacing:5px;}
@@ -368,7 +381,7 @@
       .team-track{padding-left:42px;}
       .race-logo{width:32px;height:32px;}
       .team-name{font-size:13px;letter-spacing:.8px;}
-      .score-dark,.score-gold{font-size:15px;}
+      .score-dark,.score-gold{font-size:13px;}
       .footer-cell{font-size:14px;letter-spacing:1px;min-height:34px;}
     }
   </style>
@@ -391,17 +404,23 @@
       <section class="upload-bar">
         <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" multiple />
         <select id="monthMode">
-          <option value="last4">Últimos 4 meses</option>
           <option value="last2">Últimos 2 meses</option>
-          <option value="first4">Primeros 4 meses</option>
-          <option value="first2">Primeros 2 meses</option>
-          <option value="all">Todo el archivo</option>
+          <option value="last4">Últimos 4 meses</option>
+          <option value="last6">Últimos 6 meses</option>
+          <option value="last12">Últimos 12 meses</option>
+          <option value="all">Todos los meses detectados</option>
         </select>
         <button id="btnUpdate">Actualizar ranking</button>
       </section>
 
+      <div class="note">
+        Puedes subir hasta 8 archivos Excel, uno por cada equipo. Cada hoja puede llamarse Enero, Febrero, Marzo, etc.
+        La meta se calcula automáticamente: 2 meses = 200 puntos, 12 meses = 1200 puntos.
+      </div>
+
       <section class="indicators">
         <div class="indicator-card"><span>Meses leídos</span><strong id="kpiMonths">0</strong></div>
+        <div class="indicator-card"><span>Meta ranking</span><strong id="kpiTarget">0</strong></div>
         <div class="indicator-card"><span>Equipo líder</span><strong id="kpiLeader">-</strong></div>
         <div class="indicator-card"><span>Puntos líder</span><strong id="kpiLeaderPoints">0</strong></div>
         <div class="indicator-card"><span>Avance líder</span><strong id="kpiPercent">0%</strong></div>
@@ -414,11 +433,13 @@
         <div class="footer-cell points-footer">PUNTOS</div>
       </section>
 
-      <div id="status" class="status">Carga un Excel o CSV para generar el ranking.</div>
+      <div id="status" class="status">Carga los Excel o CSV para generar el ranking.</div>
     </section>
   </main>
 
   <script>
+    const POINTS_PER_MONTH = 100;
+
     const TEAMS = [
       { name:"1RX", logo:"logos/logo_1rx.png" },
       { name:"LOS CIENTIFICOS", logo:"logos/logo_los_cientificos.png" },
@@ -428,6 +449,11 @@
       { name:"SOLVENTE", logo:"logos/logo_solvente.png" },
       { name:"WATER BASE", logo:"logos/logo_water_base.png" },
       { name:"CALIDAD", logo:"logos/logo_calidad.png" }
+    ];
+
+    const MONTH_ORDER = [
+      "ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO",
+      "JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"
     ];
 
     let uploadedRows = [];
@@ -474,7 +500,7 @@
         { name:"CND", keys:["CND"] },
         { name:"LOS 20KG", keys:["LOS 20KG","20KG","20 KG"] },
         { name:"SOLVENTE", keys:["SOLVENTE","SOLVENT","SOLVENTE UNITED"] },
-        { name:"WATER BASE", keys:["WATER BASE","H2O","AGUA","BASE AGUA"] },
+        { name:"WATER BASE", keys:["WATER BASE","H2O","AGUA","BASE AGUA","BASE DE AGUA"] },
         { name:"CALIDAD", keys:["CALIDAD","QUALITY"] }
       ];
 
@@ -491,40 +517,45 @@
       return exact ? exact.name : norm;
     }
 
-    function inferMonthFromText(text){
-      const raw = normalizeText(text);
-      const months = [
-        "ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO",
-        "JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"
-      ];
-      const foundMonth = months.find(month => raw.includes(month));
-      const yearMatch = raw.match(/20[0-9]{2}/);
-      const year = yearMatch ? yearMatch[0] : "";
+    function monthKey(value){
+      const raw = normalizeText(value);
+      const month = MONTH_ORDER.find(item => raw.includes(item));
+      if(month) return month;
 
-      if(foundMonth) return year ? `${foundMonth} ${year}` : foundMonth;
-
-      const dateMatch = raw.match(/([0-9]{1,2})[-/ ]([0-9]{1,2})[-/ ](20[0-9]{2})/);
-      if(dateMatch){
-        return `${dateMatch[3]}-${String(dateMatch[2]).padStart(2,"0")}`;
+      const match = raw.match(/([0-9]{1,2})[-/ ]([0-9]{1,2})[-/ ](20[0-9]{2})/);
+      if(match){
+        const monthNumber = Number(match[2]);
+        return MONTH_ORDER[monthNumber - 1] || raw;
       }
 
-      return "";
+      const ym = raw.match(/(20[0-9]{2})[-/ ]([0-9]{1,2})/);
+      if(ym){
+        const monthNumber = Number(ym[2]);
+        return MONTH_ORDER[monthNumber - 1] || raw;
+      }
+
+      return raw || "SIN MES";
     }
 
-    function parseMonth(value){
-      if(value === null || value === undefined || value === "") return "SIN MES";
+    function monthSortValue(month){
+      const index = MONTH_ORDER.indexOf(monthKey(month));
+      return index >= 0 ? index : 99;
+    }
 
+    function parseMonth(value, fallback){
       if(value instanceof Date && !isNaN(value)){
-        return `${value.getFullYear()}-${String(value.getMonth()+1).padStart(2,"0")}`;
+        return MONTH_ORDER[value.getMonth()];
       }
 
       if(typeof value === "number" && XLSX && XLSX.SSF){
         const parsed = XLSX.SSF.parse_date_code(value);
-        if(parsed) return `${parsed.y}-${String(parsed.m).padStart(2,"0")}`;
+        if(parsed) return MONTH_ORDER[parsed.m - 1] || String(value);
       }
 
-      const detected = inferMonthFromText(value);
-      return detected || normalizeText(value) || "SIN MES";
+      const candidate = monthKey(value);
+      if(candidate && candidate !== "SIN MES") return candidate;
+
+      return monthKey(fallback || "SIN MES");
     }
 
     function findColumn(row, aliases){
@@ -535,37 +566,6 @@
         if(found) return found;
       }
       return null;
-    }
-
-    function mapRows(rawRows){
-      return rawRows.map(row => {
-        const teamCol = findColumn(row, ["equipo","grupo","team","area","nombre del equipo"]);
-        const monthCol = findColumn(row, ["mes","month","fecha","periodo"]);
-        const pointCol = findColumn(row, ["p obtenido","puntos obtenidos","puntaje","puntos","score","total"]);
-        const maxCol = findColumn(row, ["maximo","máximo","p maximo","puntos maximos","meta"]);
-
-        return {
-          team: teamCanonical(teamCol ? row[teamCol] : ""),
-          month: parseMonth(monthCol ? row[monthCol] : "SIN MES"),
-          points: cleanNumber(pointCol ? row[pointCol] : 0),
-          max: cleanNumber(maxCol ? row[maxCol] : 1200) || 1200
-        };
-      }).filter(row => TEAMS.some(team => normalizeText(team.name) === normalizeText(row.team)) && row.points > 0);
-    }
-
-    function csvTextToMatrix(text){
-      const delimiter = text.includes(";") ? ";" : ",";
-      return text
-        .replace(/^\uFEFF/,"")
-        .split(/\r?\n/)
-        .filter(line => line.trim() !== "")
-        .map(line => line.split(delimiter).map(cell => {
-          let value = String(cell ?? "").trim();
-          if(value.startsWith('"') && value.endsWith('"')){
-            value = value.slice(1,-1);
-          }
-          return value.replace(/""/g,'"').trim();
-        }));
     }
 
     function getCell(matrix, row, col){
@@ -594,17 +594,60 @@
 
     function findNearbyNumber(matrix, row, col){
       const values = nearbyCells(matrix,row,col,4,10);
-      const found = values.find(value => cleanNumber(value) > 0);
+      const found = values.find(value => {
+        const n = cleanNumber(value);
+        return n > 0 && n <= 1200;
+      });
       return found !== undefined ? cleanNumber(found) : 0;
+    }
+
+    function csvTextToMatrix(text){
+      const delimiter = text.includes(";") ? ";" : ",";
+      return text
+        .replace(/^\uFEFF/,"")
+        .split(/\r?\n/)
+        .filter(line => line.trim() !== "")
+        .map(line => line.split(delimiter).map(cell => {
+          let value = String(cell ?? "").trim();
+          if(value.startsWith('"') && value.endsWith('"')){
+            value = value.slice(1,-1);
+          }
+          return value.replace(/""/g,'"').trim();
+        }));
+    }
+
+    function mapStructuredRows(rawRows, sheetName, fileName){
+      return rawRows.map(row => {
+        const teamCol = findColumn(row, ["equipo","grupo","team","area","nombre del equipo"]);
+        const monthCol = findColumn(row, ["mes","month","fecha","periodo"]);
+        const pointCol = findColumn(row, ["p obtenido","puntos obtenidos","puntaje","puntos","score","total"]);
+
+        const team = teamCanonical(
+          teamCol ? row[teamCol] : inferTeamFromText(fileName + " " + sheetName)
+        );
+
+        const month = parseMonth(
+          monthCol ? row[monthCol] : sheetName,
+          sheetName
+        );
+
+        return {
+          team,
+          month,
+          points: cleanNumber(pointCol ? row[pointCol] : 0),
+          source: fileName + " / " + sheetName
+        };
+      }).filter(row => {
+        return TEAMS.some(team => normalizeText(team.name) === normalizeText(row.team)) && row.points > 0;
+      });
     }
 
     function scanMessySheet(matrix, sheetName, fileName){
       const rows = [];
-      const flatText = [sheetName, fileName].concat(matrix.flat()).join(" ");
+      const fullText = [fileName, sheetName].concat(matrix.flat()).join(" ");
 
-      let currentTeam = inferTeamFromText(flatText);
-      let currentMonth = inferMonthFromText(flatText);
-      let currentMax = 1200;
+      let currentTeam = inferTeamFromText(fullText);
+      let currentMonth = parseMonth(sheetName, sheetName);
 
       for(let r = 0; r < matrix.length; r++){
         for(let c = 0; c < (matrix[r] || []).length; c++){
@@ -614,25 +657,19 @@
           const teamInCell = inferTeamFromText(cell);
           if(teamInCell) currentTeam = teamInCell;
 
-          const monthInCell = inferMonthFromText(cell);
-          if(monthInCell) currentMonth = monthInCell;
-
           if(norm.includes("NOMBRE DEL EQUIPO") || norm === "EQUIPO" || norm.includes("GRUPO")){
             const foundTeam = inferTeamFromText(findNearbyValue(matrix,r,c));
             if(foundTeam) currentTeam = foundTeam;
           }
 
           if(norm.includes("MES") || norm.includes("PERIODO") || norm.includes("FECHA")){
-            const foundMonth = inferMonthFromText(String(cell) + " " + String(findNearbyValue(matrix,r,c)));
-            if(foundMonth) currentMonth = foundMonth;
-          }
-
-          if(norm.includes("MAXIMO") || norm.includes("META")){
-            const foundMax = findNearbyNumber(matrix,r,c);
-            if(foundMax > 0) currentMax = foundMax;
+            const foundMonth = parseMonth(String(cell) + " " + String(findNearbyValue(matrix,r,c)), sheetName);
+            if(foundMonth !== "SIN MES") currentMonth = foundMonth;
           }
         }
       }
+
+      const pointValues = [];
 
       for(let r = 0; r < matrix.length; r++){
         for(let c = 0; c < (matrix[r] || []).length; c++){
@@ -647,36 +684,35 @@
 
           if(isPointsLabel){
             const points = findNearbyNumber(matrix,r,c);
-            if(points > 0 && currentTeam){
-              rows.push({
-                team: currentTeam,
-                month: currentMonth || normalizeText(sheetName) || "SIN MES",
-                points: points,
-                max: currentMax || 1200
-              });
+            if(points > 0) pointValues.push(points);
+          }
+        }
+      }
+
+      if(pointValues.length === 0){
+        for(let r = 0; r < matrix.length; r++){
+          for(let c = 0; c < (matrix[r] || []).length; c++){
+            const norm = normalizeText(getCell(matrix,r,c));
+            if(norm === "TOTAL"){
+              const rowNumbers = (matrix[r] || []).map(cleanNumber).filter(number => number > 0 && number <= 1200);
+              if(rowNumbers.length) pointValues.push(Math.max(...rowNumbers));
             }
           }
         }
       }
 
-      if(rows.length === 0 && currentTeam){
-        for(let r = 0; r < matrix.length; r++){
-          for(let c = 0; c < (matrix[r] || []).length; c++){
-            const norm = normalizeText(getCell(matrix,r,c));
-            if(norm === "TOTAL"){
-              const rowNumbers = (matrix[r] || []).map(cleanNumber).filter(number => number > 0);
-              const points = rowNumbers.length ? Math.max(...rowNumbers) : 0;
-              if(points > 0){
-                rows.push({
-                  team: currentTeam,
-                  month: currentMonth || normalizeText(sheetName) || "SIN MES",
-                  points: points,
-                  max: currentMax || 1200
-                });
-              }
-            }
-          }
-        }
+      if(currentTeam && pointValues.length){
+        // Regla crítica:
+        // Cada hoja mensual debe valer máximo 100 puntos.
+        // Si aparecen varios P Obtenido dentro de la misma hoja, se suman, pero se limita a 100.
+        const monthlyPoints = Math.min(POINTS_PER_MONTH, pointValues.reduce((a,b) => a + b, 0));
+
+        rows.push({
+          team: currentTeam,
+          month: currentMonth,
+          points: monthlyPoints,
+          source: fileName + " / " + sheetName
+        });
       }
 
       return rows.filter(row => TEAMS.some(team => normalizeText(team.name) === normalizeText(row.team)));
@@ -703,10 +739,10 @@
           workbookCsv.SheetNames.forEach(sheetName => {
             const sheet = workbookCsv.Sheets[sheetName];
             const tableRows = XLSX.utils.sheet_to_json(sheet,{ defval:"", raw:false });
-            structuredRows.push(...mapRows(tableRows));
+            structuredRows.push(...mapStructuredRows(tableRows,sheetName,file.name));
           });
         }catch(error){
-          console.warn("No se pudo leer el CSV como tabla, se usó escaneo:", error);
+          console.warn("CSV leído por escaneo:", error);
         }
       }else{
         const data = await file.arrayBuffer();
@@ -715,67 +751,86 @@
         workbook.SheetNames.forEach(sheetName => {
           const sheet = workbook.Sheets[sheetName];
 
+          // Lectura 1: tabla normal si existe.
           const tableRows = XLSX.utils.sheet_to_json(sheet,{ defval:"", raw:false });
-          structuredRows.push(...mapRows(tableRows));
+          structuredRows.push(...mapStructuredRows(tableRows,sheetName,file.name));
 
+          // Lectura 2: escaneo de toda la hoja, incluso si está desordenada.
           const matrix = XLSX.utils.sheet_to_json(sheet,{ header:1, defval:"", raw:false });
           scannedRows.push(...scanMessySheet(matrix,sheetName,file.name));
         });
       }
 
-      const finalRows = structuredRows.length > 0 ? structuredRows : scannedRows;
-
+      const all = structuredRows.concat(scannedRows);
       console.log("Archivo leído:", file.name);
-      console.table(finalRows);
-
-      return finalRows;
+      console.table(all);
+      return all;
     }
 
-    function selectedRowsByMonth(rows){
-      const mode = $("monthMode").value;
-      if(mode === "all") return rows;
+    function aggregateTeamMonth(rows){
+      const map = new Map();
 
+      rows.forEach(row => {
+        const key = `${row.team}||${row.month}`;
+        if(!map.has(key)){
+          map.set(key,{ team:row.team, month:row.month, points:0, sources:[] });
+        }
+
+        const item = map.get(key);
+        item.points += row.points || 0;
+        item.sources.push(row.source);
+      });
+
+      // Máximo 100 puntos por equipo por mes.
+      return [...map.values()].map(item => ({
+        ...item,
+        points: Math.min(POINTS_PER_MONTH, item.points)
+      }));
+    }
+
+    function getSelectedMonths(rows){
       const months = [...new Set(rows.map(row => row.month))]
         .filter(month => month && month !== "SIN MES")
-        .sort((a,b) => String(a).localeCompare(String(b),"es",{numeric:true}));
+        .sort((a,b) => monthSortValue(a) - monthSortValue(b));
 
-      if(months.length === 0) return rows;
+      const mode = $("monthMode").value;
+      if(mode === "all") return months;
 
-      let selected;
-      if(mode === "first4") selected = months.slice(0,4);
-      else if(mode === "first2") selected = months.slice(0,2);
-      else if(mode === "last2") selected = months.slice(-2);
-      else selected = months.slice(-4);
-
-      return rows.filter(row => selected.includes(row.month));
+      const count = Number(mode.replace("last","")) || 4;
+      return months.slice(-count);
     }
 
     function calculateRanking(){
-      const selected = selectedRowsByMonth(uploadedRows);
+      const monthlyRows = aggregateTeamMonth(uploadedRows);
+      const selectedMonths = getSelectedMonths(monthlyRows);
+      const target = selectedMonths.length * POINTS_PER_MONTH;
+
       const totals = new Map();
 
       TEAMS.forEach(team => {
-        totals.set(team.name,{ ...team, points:0, max:1200 });
+        totals.set(team.name,{ ...team, points:0, target });
       });
 
-      selected.forEach(row => {
-        const item = totals.get(row.team);
-        if(!item) return;
+      monthlyRows
+        .filter(row => selectedMonths.includes(row.month))
+        .forEach(row => {
+          const item = totals.get(row.team);
+          if(!item) return;
+          item.points += row.points || 0;
+        });
 
-        item.points += row.points || 0;
-        item.max += row.max || 1200;
-      });
-
-      return [...totals.values()]
+      const ranking = [...totals.values()]
         .sort((a,b) => b.points - a.points || a.name.localeCompare(b.name))
         .slice(0,8);
+
+      return { ranking, selectedMonths, target, monthlyRows };
     }
 
-    function renderRanking(data){
+    function renderRanking(data,target){
       const ranking = $("ranking");
       ranking.innerHTML = "";
 
-      const raceMax = Math.max(1,...data.map(item => item.points || 0));
+      const raceMax = Math.max(1,target);
 
       data.forEach((team,index) => {
         const progress = Math.max(0,Math.min(100,((team.points || 0) / raceMax) * 100));
@@ -794,8 +849,8 @@
             <span class="team-name">${team.name}</span>
             <div class="finish-line"></div>
           </div>
-          <div class="score-dark">0</div>
-          <div class="score-gold">${formatPoints(team.points || 0)}</div>
+          <div class="score-dark">${formatPoints(team.points || 0)}</div>
+          <div class="score-gold">${formatPoints(target)}</div>
         `;
 
         ranking.appendChild(row);
@@ -868,10 +923,11 @@
         ctx.stroke();
       }
 
+      const middle = Math.round(maxValue / 2);
       const labels = [
         { text:"0", p:10 },
-        { text:"600", p:50 },
-        { text:"1200", p:90 }
+        { text:String(middle), p:50 },
+        { text:String(maxValue), p:90 }
       ];
 
       labels.forEach(label => {
@@ -913,33 +969,44 @@
     }
 
     function updateDashboard(){
-      const data = calculateRanking();
-      renderRanking(data);
+      const result = calculateRanking();
+      const data = result.ranking;
+      const selectedMonths = result.selectedMonths;
+      const target = result.target || POINTS_PER_MONTH;
 
-      const selected = selectedRowsByMonth(uploadedRows);
-      const months = [...new Set(selected.map(row => row.month))].filter(Boolean);
+      renderRanking(data,target);
 
-      const leader = data[0] || { name:"-", points:0, max:1200 };
-      const maxForGauge = Math.max(1200,leader.max || 1200,leader.points || 0);
-      const percent = maxForGauge > 0 ? Math.min(100,(leader.points / maxForGauge) * 100) : 0;
+      const leader = data[0] || { name:"-", points:0 };
+      const percent = target > 0 ? Math.min(100,(leader.points / target) * 100) : 0;
 
-      $("kpiMonths").textContent = months.length;
+      $("kpiMonths").textContent = selectedMonths.length;
+      $("kpiTarget").textContent = formatPoints(target);
       $("kpiLeader").textContent = leader.points > 0 ? leader.name : "-";
       $("kpiLeaderPoints").textContent = formatPoints(leader.points || 0);
       $("kpiPercent").textContent = `${percent.toFixed(1)}%`;
 
-      drawGauge(leader.points || 0,maxForGauge);
+      drawGauge(leader.points || 0,target);
 
       if(uploadedRows.length){
-        $("status").innerHTML = `Registros detectados: <b>${uploadedRows.length}</b>. Meses considerados: <b>${months.join(", ") || "sin mes"}</b>.`;
+        $("status").innerHTML =
+          `Registros detectados: <b>${uploadedRows.length}</b>. ` +
+          `Meses usados: <b>${selectedMonths.join(", ") || "sin mes"}</b>. ` +
+          `Meta calculada: <b>${formatPoints(target)}</b> puntos.`;
       }else{
-        $("status").innerHTML = `<span class="warning">No hay datos cargados. Revisa que el archivo tenga datos de equipo, mes y puntos.</span>`;
+        $("status").innerHTML = `<span class="warning">No hay datos cargados. Sube los Excel de los equipos.</span>`;
       }
+
+      console.log("Meses seleccionados:", selectedMonths);
+      console.table(result.monthlyRows);
     }
 
     $("fileInput").addEventListener("change",async function(event){
       uploadedRows = [];
       const files = Array.from(event.target.files || []);
+
+      if(files.length > 8){
+        $("status").innerHTML = `<span class="warning">Subiste ${files.length} archivos. Se recomienda máximo 8, uno por equipo.</span>`;
+      }
 
       for(const file of files){
         try{
@@ -957,8 +1024,13 @@
     $("btnUpdate").addEventListener("click",updateDashboard);
     $("monthMode").addEventListener("change",updateDashboard);
 
-    renderRanking(TEAMS.map(team => ({ ...team, points:0, max:1200 })));
-    drawGauge(0,1200);
+    renderRanking(TEAMS.map(team => ({ ...team, points:0, target:POINTS_PER_MONTH })),POINTS_PER_MONTH);
+    drawGauge(0,POINTS_PER_MONTH);
   </script>
 </body>
 </html>
+"""
+
+path = Path("/mnt/data/index_ranking_guardianes_ehs_multi_excel.html")
+path.write_text(html, encoding="utf-8")
+print(path)

@@ -23,6 +23,9 @@ select{background:#edf1f7;color:#0b1220;min-width:205px}
 button{background:linear-gradient(180deg,#ffe37d,#d49e24);color:#101827;box-shadow:0 3px 0 #806019;cursor:pointer}
 button.secondary{background:linear-gradient(180deg,#d8e5f7,#9fafc5)}
 .note{width:min(980px,100%);margin:0 auto 12px;color:#dbe5f4;font-size:14px;text-align:center;opacity:.92}
+.upload-bottom{width:min(980px,100%);margin:22px auto 0;padding:14px;background:rgba(8,15,28,.72);border:2px solid #8b96a6;border-radius:8px;box-shadow:inset 0 0 14px rgba(255,255,255,.06)}
+.upload-bottom h3{margin:0 0 6px;text-align:center;color:#ffe27a;letter-spacing:3px;font-size:20px;text-shadow:0 2px 0 #000}
+.upload-bottom p{margin:0 0 12px;text-align:center;color:#dbe5f4;font-size:14px;line-height:1.35}
 .upload-grid{width:min(980px,100%);margin:10px auto 14px;display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
 .upload-card{display:grid;grid-template-columns:50px 1fr 190px;gap:8px;align-items:center;background:linear-gradient(180deg,#132746,#0b1728);border:2px solid #7f91a9;border-radius:8px;padding:8px}
 .upload-card img{max-width:45px;max-height:45px;object-fit:contain;filter:drop-shadow(0 2px 4px rgba(0,0,0,.75))}
@@ -66,12 +69,17 @@ button.secondary{background:linear-gradient(180deg,#d8e5f7,#9fafc5)}
 <button id="btnUpdate">Actualizar ranking</button>
 <button class="secondary" id="btnClear" type="button">Limpiar archivos</button>
 </section>
-<div class="note">Selecciona el archivo correspondiente en cada equipo. Los archivos quedan cargados hasta que presiones “Actualizar ranking” o “Limpiar archivos”. Cada hoja del Excel puede llamarse Enero, Febrero, Marzo, etc. Meta automática: meses seleccionados × 100 puntos.</div>
-<section id="teamUploadGrid" class="upload-grid"></section>
 <section class="kpis"><div class="kpi"><span>Meses leídos</span><strong id="kpiMonths">0</strong></div><div class="kpi"><span>Meta ranking</span><strong id="kpiTarget">0</strong></div><div class="kpi"><span>Equipo líder</span><strong id="kpiLeader">-</strong></div><div class="kpi"><span>Puntos líder</span><strong id="kpiLeaderPoints">0</strong></div><div class="kpi"><span>Avance líder</span><strong id="kpiPercent">0%</strong></div></section>
 <section id="ranking" class="ranking"></section>
 <section class="foot"><div class="teamFoot">EQUIPO</div><div class="pointsFoot">META</div></section>
 <div id="status" class="status">Selecciona los archivos de cada equipo y luego presiona Actualizar ranking.</div>
+
+<section class="upload-bottom">
+  <h3>CARGA DE ARCHIVOS POR EQUIPO</h3>
+  <p>Selecciona el archivo correspondiente en cada equipo. Los archivos quedan cargados hasta que presiones “Actualizar ranking” o “Limpiar archivos”. Cada hoja del Excel puede llamarse Enero, Febrero, Marzo, etc. Meta automática: meses seleccionados × 100 puntos.</p>
+  <section id="teamUploadGrid" class="upload-grid"></section>
+</section>
+
 </section></main>
 <script>
 const POINTS_PER_MONTH=100;

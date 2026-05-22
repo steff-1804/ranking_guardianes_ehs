@@ -62,8 +62,8 @@ button.secondary{background:linear-gradient(180deg,#d8e5f7,#9fafc5)}
 <select id="monthMode">
 <option value="last1">Ver 1 mes desde febrero</option>
 <option value="last2">Ver 2 meses desde febrero</option>
-<option value="last3">Ver 3 meses desde febrero</option>
-<option value="last4" selected>Ver 4 meses desde febrero</option>
+<option value="last3" selected>Ver 3 meses desde febrero</option>
+<option value="last4">Ver 4 meses desde febrero</option>
 <option value="last5">Ver 5 meses desde febrero</option>
 <option value="last6">Ver 6 meses desde febrero</option>
 <option value="last7">Ver 7 meses desde febrero</option>
@@ -72,7 +72,7 @@ button.secondary{background:linear-gradient(180deg,#d8e5f7,#9fafc5)}
 <option value="last10">Ver 10 meses desde febrero</option>
 <option value="last11">Ver 11 meses desde febrero</option>
 <option value="last12">Ver 12 meses desde febrero</option>
-<option value="all">Todos los meses detectados desde febrero</option>
+<option value="all">Todos los meses detectados</option>
 </select>
 <button id="btnUpdate">Actualizar ranking</button>
 <button class="secondary" id="btnClear" type="button">Limpiar archivos</button>
@@ -84,7 +84,7 @@ button.secondary{background:linear-gradient(180deg,#d8e5f7,#9fafc5)}
 
 <section class="upload-bottom">
   <h3>CARGA DE ARCHIVOS POR EQUIPO</h3>
-  <p>Selecciona el archivo correspondiente en cada equipo. Los archivos quedan cargados hasta que presiones “Actualizar ranking” o “Limpiar archivos”. Cada hoja del Excel puede llamarse Febrero, Marzo, Abril, etc. El ranking empieza desde Febrero. El código lee C65 como puntaje obtenido y C66 como puntos adicionales. Meta automática: 1 mes = 100 puntos, 2 meses = 200 puntos, hasta 12 meses = 1200 puntos. También suma “Puntos adicionales”. El orden anual inicia en Febrero.</p>
+  <p>Selecciona el archivo correspondiente en cada equipo. Los archivos quedan cargados hasta que presiones “Actualizar ranking” o “Limpiar archivos”. Cada hoja del Excel puede llamarse Febrero, Marzo, Abril, etc. El ranking empieza desde Febrero. El ranking lee estrictamente C65 como puntaje obtenido y C66 como puntos adicionales. No duplica hojas del mismo mes. Meta automática: 1 mes = 100 puntos, 2 meses = 200 puntos, hasta 12 meses = 1200 puntos. También suma “Puntos adicionales”. El orden anual inicia en Febrero.</p>
   <section id="teamUploadGrid" class="upload-grid"></section>
 </section>
 
@@ -147,73 +147,141 @@ function readFixedMonthlyPointsFromMatrix(matrix){
   return null;
 }
 function scanSheet(matrix,sheetName,fileName,teamName){let currentMonth=parseMonth(sheetName,sheetName);const pointValues=[];const additionalValues=[];for(let r=0;r<matrix.length;r++){for(let c=0;c<(matrix[r]||[]).length;c++){const value=cell(matrix,r,c),nrm=norm(value);if(nrm.includes("MES")||nrm.includes("PERIODO")||nrm.includes("FECHA")){const m=parseMonth(String(value)+" "+String(near(matrix,r,c,3,8).find(v=>String(v??"").trim()!=="")||""),sheetName);if(m!=="SIN MES")currentMonth=m}const isAdditional=nrm.includes("PUNTOS ADICIONALES")||nrm.includes("PUNTO ADICIONAL")||nrm.includes("ADICIONALES")||nrm.includes("ADICIONAL");const isPoints=!isAdditional&&(nrm.includes("P OBTENIDO")||nrm.includes("PUNTOS OBTENIDOS")||nrm==="PUNTOS"||nrm==="PUNTAJE");if(isPoints){const p=nearNum(matrix,r,c);if(p>0)pointValues.push(p)}if(isAdditional){const extra=aroundNum(matrix,r,c);if(extra>0)additionalValues.push(extra)}}}if(pointValues.length===0){for(let r=0;r<matrix.length;r++){for(let c=0;c<(matrix[r]||[]).length;c++){if(norm(cell(matrix,r,c))==="TOTAL"){const nums=(matrix[r]||[]).map(num).filter(n=>n>0&&n<=1200);if(nums.length)pointValues.push(Math.max(...nums))}}}}if(pointValues.length===0&&additionalValues.length===0)return[];const basePoints=Math.min(POINTS_PER_MONTH,pointValues.reduce((a,b)=>a+b,0));const extraPoints=additionalValues.reduce((a,b)=>a+b,0);const monthlyPoints=basePoints+extraPoints;return[{team:teamName,month:currentMonth,points:monthlyPoints,source:fileName+" / "+sheetName+" / base:"+basePoints+" extra:"+extraPoints}]}
-async function readTeamFile(file,teamName){
-  const ext=file.name.split(".").pop().toLowerCase();
-  const rows=[];
+function readNumberFromCell(sheet, address){
+  const c = sheet[address];
+  return c ? num(c.v) : 0;
+}
 
-  if(ext==="csv"){
-    const buffer=await file.arrayBuffer();
-    let text=new TextDecoder("utf-8").decode(buffer);
-    if(text.includes("�")) text=new TextDecoder("windows-1252").decode(buffer);
+function sheetMonthName(sheetName){
+  const m = monthKey(sheetName);
+  return MONTH_ORDER.includes(m) ? m : "";
+}
 
-    const matrix=csvToMatrix(text);
-    const fixed=readFixedMonthlyPointsFromMatrix(matrix);
+function readC65C66FromSheet(sheet, sheetName, fileName, teamName){
+  const month = sheetMonthName(sheetName);
+  if(!month) return null;
 
-    if(fixed){
+  const base = readNumberFromCell(sheet, "C65");
+  const extra = readNumberFromCell(sheet, "C66");
+
+  // Si ambas están vacías/cero, la hoja no aporta al ranking.
+  if(base === 0 && extra === 0) return null;
+
+  return {
+    team: teamName,
+    month,
+    points: base + extra,
+    base,
+    extra,
+    source: fileName + " / " + sheetName + " / C65:" + base + " C66:" + extra
+  };
+}
+
+async function readTeamFile(file, teamName){
+  const ext = file.name.split(".").pop().toLowerCase();
+  const rows = [];
+
+  if(ext === "csv"){
+    const buffer = await file.arrayBuffer();
+    let text = new TextDecoder("utf-8").decode(buffer);
+    if(text.includes("�")) text = new TextDecoder("windows-1252").decode(buffer);
+
+    const matrix = csvToMatrix(text);
+    const base = num(cell(matrix,64,2));   // C65
+    const extra = num(cell(matrix,65,2));  // C66
+    const month = sheetMonthName(file.name) || "FEBRERO";
+
+    if(base !== 0 || extra !== 0){
       rows.push({
-        team:teamName,
-        month:parseMonth(file.name,file.name),
-        points:fixed.total,
-        source:file.name+" / C65:"+fixed.base+" C66:"+fixed.extra
+        team: teamName,
+        month,
+        points: base + extra,
+        base,
+        extra,
+        source: file.name + " / CSV / C65:" + base + " C66:" + extra
       });
-    }else{
-      rows.push(...scanSheet(matrix,file.name,file.name,teamName));
     }
   }else{
-    const data=await file.arrayBuffer();
-    const wb=XLSX.read(data,{type:"array",cellDates:true,raw:false});
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data,{type:"array",cellDates:true,raw:false});
 
     wb.SheetNames.forEach(sheetName=>{
-      const sh=wb.Sheets[sheetName];
-      const fixed=readFixedMonthlyPointsFromSheet(sh);
-
-      if(fixed){
-        rows.push({
-          team:teamName,
-          month:parseMonth(sheetName,sheetName),
-          points:fixed.total,
-          source:file.name+" / "+sheetName+" / C65:"+fixed.base+" C66:"+fixed.extra
-        });
-      }else{
-        const matrix=XLSX.utils.sheet_to_json(sh,{header:1,defval:"",raw:false});
-        const scanned=scanSheet(matrix,sheetName,file.name,teamName);
-
-        if(scanned.length>0){
-          rows.push(...scanned);
-        }else{
-          rows.push(...mapTable(XLSX.utils.sheet_to_json(sh,{defval:"",raw:false}),sheetName,file.name,teamName));
-        }
-      }
+      const sheet = wb.Sheets[sheetName];
+      const row = readC65C66FromSheet(sheet, sheetName, file.name, teamName);
+      if(row) rows.push(row);
     });
   }
 
-  console.log("Archivo leído:",teamName,file.name,"filas:",rows.length);
+  console.log("Archivo leído estrictamente por C65/C66:", teamName, file.name, "filas:", rows.length);
   console.table(rows);
   return rows;
 }
-function aggregateTeamMonth(rows){const map=new Map();rows.forEach(r=>{const key=`${r.team}||${r.month}`;if(!map.has(key))map.set(key,{team:r.team,month:r.month,points:0,sources:[]});const item=map.get(key);item.points+=r.points||0;item.sources.push(r.source)});return[...map.values()].map(x=>({...x,points:x.points}))}
+
+function aggregateTeamMonth(rows){
+  const map = new Map();
+
+  rows.forEach(r=>{
+    const key = `${r.team}||${r.month}`;
+
+    // Un equipo debe aportar una sola vez por mes.
+    // Si el Excel tiene hojas duplicadas del mismo mes, se usa la última leída para evitar dobles conteos.
+    map.set(key,{
+      team: r.team,
+      month: r.month,
+      points: Number(r.points)||0,
+      base: Number(r.base)||0,
+      extra: Number(r.extra)||0,
+      source: r.source || ""
+    });
+  });
+
+  return [...map.values()];
+}
+
 function selectedMonthCount(){
   const mode=$("monthMode").value;
   if(mode==="all") return null;
   return Number(mode.replace("last",""))||4;
 }
 function selectedMonths(rows){
-  const months=[...new Set(rows.map(r=>r.month))].filter(m=>m&&m!=="SIN MES").sort((a,b)=>monthSort(a)-monthSort(b));
-  const count=selectedMonthCount();
-  if(count===null) return months;
-  return months.slice(0,count);
+  const available = [...new Set(rows.map(r=>r.month))]
+    .filter(m=>m&&m!=="SIN MES")
+    .sort((a,b)=>monthSort(a)-monthSort(b));
+
+  const count = selectedMonthCount();
+  if(count===null) return available;
+
+  // La selección siempre empieza en FEBRERO.
+  // Ejemplo: Ver 3 meses = FEBRERO + MARZO + ABRIL.
+  const requested = MONTH_ORDER.slice(0,count);
+
+  // Solo se suman los meses solicitados que estén cargados.
+  return requested.filter(m=>available.includes(m));
 }
-function calculate(){const monthly=aggregateTeamMonth(uploadedRows);const months=selectedMonths(monthly);const requestedCount=selectedMonthCount();const target=(requestedCount===null?months.length:requestedCount)*POINTS_PER_MONTH;const totals=new Map();TEAMS.forEach(t=>totals.set(t.name,{...t,points:0,target}));monthly.filter(r=>months.includes(r.month)).forEach(r=>{const item=totals.get(r.team);if(item)item.points+=r.points||0});const ranking=[...totals.values()].sort((a,b)=>b.points-a.points||a.name.localeCompare(b.name)).slice(0,8);return{ranking,months,target,monthly}}
+
+function calculate(){
+  const monthly = aggregateTeamMonth(uploadedRows);
+  const months = selectedMonths(monthly);
+  const requestedCount = selectedMonthCount();
+  const target = (requestedCount===null ? months.length : requestedCount) * POINTS_PER_MONTH;
+
+  const totals = new Map();
+  TEAMS.forEach(t=>totals.set(t.name,{...t,points:0,target}));
+
+  monthly
+    .filter(r=>months.includes(r.month))
+    .forEach(r=>{
+      const item = totals.get(r.team);
+      if(item) item.points += Number(r.points)||0;
+    });
+
+  const ranking = [...totals.values()]
+    .sort((a,b)=>b.points-a.points||a.name.localeCompare(b.name))
+    .slice(0,8);
+
+  return {ranking,months,target,monthly};
+}
+
 function render(data,target){const root=$("ranking");root.innerHTML="";const raceMax=Math.max(1,target);data.forEach((team,i)=>{const progress=Math.max(0,Math.min(100,((team.points||0)/raceMax)*100));const logoLeft=Math.max(6,Math.min(86,progress*.86));const row=document.createElement("article");row.className="row";row.innerHTML=`<div class="pos">${i+1}</div><div class="logo"><img src="${team.logo}" alt="${team.name}" onerror="this.style.display='none'"></div><div class="track"><div class="fill" style="width:${progress}%"></div><img class="runner" src="${team.logo}" alt="${team.name}" style="left:${logoLeft}%" onerror="this.style.display='none'"><span class="name">${team.name}</span><div class="finish"></div></div><div class="score">${fmt(team.points||0)}</div><div class="target">${fmt(target)}</div>`;root.appendChild(row)})}
 function drawGauge(value,maxValue){const canvas=$("gaugeCanvas"),ctx=canvas.getContext("2d"),w=canvas.width,h=canvas.height;ctx.clearRect(0,0,w,h);const cx=w/2,cy=h-25,rx=w*.42,ry=h*.78,pct=Math.max(0,Math.min(1,maxValue>0?value/maxValue:0));function band(sp,ep,orx,ory,irx,iry,color){const start=Math.PI-Math.PI*sp/100,end=Math.PI-Math.PI*ep/100;ctx.beginPath();for(let i=0;i<=90;i++){const a=start+(end-start)*i/90,x=cx+Math.cos(a)*orx,y=cy-Math.sin(a)*ory;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)}for(let i=90;i>=0;i--){const a=start+(end-start)*i/90,x=cx+Math.cos(a)*irx,y=cy-Math.sin(a)*iry;ctx.lineTo(x,y)}ctx.closePath();ctx.fillStyle=color;ctx.fill()}band(0,100,rx+25,ry+25,rx-125,ry-82,"#dce1e8");ctx.strokeStyle="#4a5563";ctx.lineWidth=5;ctx.stroke();band(0,58,rx,ry,rx-90,ry-55,"#159844");band(58,82,rx,ry,rx-90,ry-55,"#d6c92b");band(82,100,rx,ry,rx-90,ry-55,"#c12a23");for(let i=0;i<=100;i+=2){const a=Math.PI-Math.PI*i/100,major=i%10===0,x1=cx+Math.cos(a)*(rx-8),y1=cy-Math.sin(a)*(ry-8),x2=cx+Math.cos(a)*(rx-(major?42:27)),y2=cy-Math.sin(a)*(ry-(major?30:19));ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.strokeStyle="rgba(15,23,42,.82)";ctx.lineWidth=major?3:1.2;ctx.stroke()}[{text:"0",p:10},{text:String(Math.round(maxValue/2)),p:50},{text:String(maxValue),p:90}].forEach(l=>{const a=Math.PI-Math.PI*l.p/100,x=cx+Math.cos(a)*(rx-130),y=cy-Math.sin(a)*(ry-80);ctx.fillStyle="#111827";ctx.font="900 34px Arial";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(l.text,x,y)});ctx.fillStyle="#111827";ctx.font="900 56px Arial";ctx.textAlign="center";ctx.fillText(fmt(value),cx,cy-95);const na=Math.PI-Math.PI*pct,nx=cx+Math.cos(na)*(rx-75),ny=cy-Math.sin(na)*(ry-50);ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(nx,ny);ctx.strokeStyle="#d22121";ctx.lineWidth=9;ctx.lineCap="round";ctx.stroke();ctx.beginPath();ctx.arc(cx,cy,18,0,Math.PI*2);ctx.fillStyle="#27364a";ctx.fill();ctx.strokeStyle="#e5e7eb";ctx.lineWidth=4;ctx.stroke()}
 function updateView(){const res=calculate(),data=res.ranking,target=res.target||POINTS_PER_MONTH,leader=data[0]||{name:"-",points:0},percent=target>0?Math.min(100,leader.points/target*100):0;render(data,target);$("kpiMonths").textContent=res.months.length;$("kpiTarget").textContent=fmt(target);$("kpiLeader").textContent=leader.points>0?leader.name:"-";$("kpiLeaderPoints").textContent=fmt(leader.points||0);$("kpiPercent").textContent=percent.toFixed(1)+"%";drawGauge(leader.points||0,target);$("status").innerHTML=uploadedRows.length?`Equipos con archivo: <b>${teamFiles.size}</b>. Registros detectados: <b>${uploadedRows.length}</b>. Meses usados: <b>${res.months.join(", ")||"sin mes"}</b>. Meta calculada: <b>${fmt(target)}</b> puntos.`:`Selecciona los archivos de cada equipo y luego presiona <b>Actualizar ranking</b>.`;console.log("Meses seleccionados:",res.months);console.table(res.monthly)}

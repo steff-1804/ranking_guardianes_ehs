@@ -84,7 +84,7 @@ button.secondary{background:linear-gradient(180deg,#d8e5f7,#9fafc5)}
 
 <section class="upload-bottom">
   <h3>CARGA DE ARCHIVOS POR EQUIPO</h3>
-  <p>Selecciona el archivo correspondiente en cada equipo. Los archivos quedan cargados hasta que presiones “Actualizar ranking” o “Limpiar archivos”. Cada hoja del Excel puede llamarse Febrero, Marzo, Abril, etc. El ranking empieza desde Febrero. El ranking lee estrictamente C65 como puntaje obtenido y C66 como puntos adicionales. No duplica hojas del mismo mes. Meta automática: 1 mes = 100 puntos, 2 meses = 200 puntos, hasta 12 meses = 1200 puntos. También suma “Puntos adicionales”. El orden anual inicia en Febrero.</p>
+  <p>Selecciona el archivo correspondiente en cada equipo. Los archivos quedan cargados hasta que presiones “Actualizar ranking” o “Limpiar archivos”. Cada hoja del Excel puede llamarse Febrero, Marzo, Abril, etc. El ranking empieza desde Febrero. El ranking lee C65 como puntaje obtenido y C66 como puntos adicionales. Si la hoja no tiene nombre de mes, se asigna por orden desde Febrero. Meta automática: 1 mes = 100 puntos, 2 meses = 200 puntos, hasta 12 meses = 1200 puntos. También suma “Puntos adicionales”. El orden anual inicia en Febrero.</p>
   <section id="teamUploadGrid" class="upload-grid"></section>
 </section>
 
@@ -177,6 +177,50 @@ function readC65C66FromSheet(sheet, sheetName, fileName, teamName){
   };
 }
 
+function getCellRawValue(sheet, address){
+  const c = sheet[address];
+  if(!c) return 0;
+
+  // SheetJS suele traer el valor en .v. Si viene como texto visible, usa .w.
+  const primary = c.v !== undefined && c.v !== null ? c.v : c.w;
+  const n = num(primary);
+
+  if(n !== 0) return n;
+
+  // Si la celda tiene fórmula sin valor cacheado, el navegador no puede calcularla.
+  // En ese caso devolverá 0. Debes guardar el Excel con valores calculados desde Excel.
+  return 0;
+}
+
+function sheetMonthName(sheetName, sheetIndex){
+  const m = monthKey(sheetName);
+  if(MONTH_ORDER.includes(m)) return m;
+
+  // Respaldo: si la hoja no se llama Febrero/Marzo/etc.,
+  // se asigna por posición: hoja 1 = FEBRERO, hoja 2 = MARZO, hoja 3 = ABRIL...
+  return MONTH_ORDER[sheetIndex % MONTH_ORDER.length];
+}
+
+function readC65C66FromSheet(sheet, sheetName, fileName, teamName, sheetIndex){
+  const month = sheetMonthName(sheetName, sheetIndex);
+  const base = getCellRawValue(sheet, "C65");
+  const extra = getCellRawValue(sheet, "C66");
+
+  if(base === 0 && extra === 0){
+    console.warn("Hoja sin datos en C65/C66:", teamName, fileName, sheetName, "C65=", base, "C66=", extra);
+    return null;
+  }
+
+  return {
+    team: teamName,
+    month,
+    points: base + extra,
+    base,
+    extra,
+    source: fileName + " / " + sheetName + " / C65:" + base + " C66:" + extra
+  };
+}
+
 async function readTeamFile(file, teamName){
   const ext = file.name.split(".").pop().toLowerCase();
   const rows = [];
@@ -189,30 +233,31 @@ async function readTeamFile(file, teamName){
     const matrix = csvToMatrix(text);
     const base = num(cell(matrix,64,2));   // C65
     const extra = num(cell(matrix,65,2));  // C66
-    const month = sheetMonthName(file.name) || "FEBRERO";
 
     if(base !== 0 || extra !== 0){
       rows.push({
         team: teamName,
-        month,
+        month: "FEBRERO",
         points: base + extra,
         base,
         extra,
         source: file.name + " / CSV / C65:" + base + " C66:" + extra
       });
+    }else{
+      console.warn("CSV sin datos en C65/C66:", teamName, file.name);
     }
   }else{
     const data = await file.arrayBuffer();
     const wb = XLSX.read(data,{type:"array",cellDates:true,raw:false});
 
-    wb.SheetNames.forEach(sheetName=>{
+    wb.SheetNames.forEach((sheetName, sheetIndex)=>{
       const sheet = wb.Sheets[sheetName];
-      const row = readC65C66FromSheet(sheet, sheetName, file.name, teamName);
+      const row = readC65C66FromSheet(sheet, sheetName, file.name, teamName, sheetIndex);
       if(row) rows.push(row);
     });
   }
 
-  console.log("Archivo leído estrictamente por C65/C66:", teamName, file.name, "filas:", rows.length);
+  console.log("Archivo leído por C65/C66:", teamName, file.name, "filas detectadas:", rows.length);
   console.table(rows);
   return rows;
 }
@@ -223,8 +268,10 @@ function aggregateTeamMonth(rows){
   rows.forEach(r=>{
     const key = `${r.team}||${r.month}`;
 
-    // Un equipo debe aportar una sola vez por mes.
-    // Si el Excel tiene hojas duplicadas del mismo mes, se usa la última leída para evitar dobles conteos.
+    if(map.has(key)){
+      console.warn("Mes duplicado para equipo. Se usa el último registro:", key, r);
+    }
+
     map.set(key,{
       team: r.team,
       month: r.month,
@@ -251,11 +298,7 @@ function selectedMonths(rows){
   const count = selectedMonthCount();
   if(count===null) return available;
 
-  // La selección siempre empieza en FEBRERO.
-  // Ejemplo: Ver 3 meses = FEBRERO + MARZO + ABRIL.
   const requested = MONTH_ORDER.slice(0,count);
-
-  // Solo se suman los meses solicitados que estén cargados.
   return requested.filter(m=>available.includes(m));
 }
 
@@ -286,7 +329,10 @@ function render(data,target){const root=$("ranking");root.innerHTML="";const rac
 function drawGauge(value,maxValue){const canvas=$("gaugeCanvas"),ctx=canvas.getContext("2d"),w=canvas.width,h=canvas.height;ctx.clearRect(0,0,w,h);const cx=w/2,cy=h-25,rx=w*.42,ry=h*.78,pct=Math.max(0,Math.min(1,maxValue>0?value/maxValue:0));function band(sp,ep,orx,ory,irx,iry,color){const start=Math.PI-Math.PI*sp/100,end=Math.PI-Math.PI*ep/100;ctx.beginPath();for(let i=0;i<=90;i++){const a=start+(end-start)*i/90,x=cx+Math.cos(a)*orx,y=cy-Math.sin(a)*ory;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)}for(let i=90;i>=0;i--){const a=start+(end-start)*i/90,x=cx+Math.cos(a)*irx,y=cy-Math.sin(a)*iry;ctx.lineTo(x,y)}ctx.closePath();ctx.fillStyle=color;ctx.fill()}band(0,100,rx+25,ry+25,rx-125,ry-82,"#dce1e8");ctx.strokeStyle="#4a5563";ctx.lineWidth=5;ctx.stroke();band(0,58,rx,ry,rx-90,ry-55,"#159844");band(58,82,rx,ry,rx-90,ry-55,"#d6c92b");band(82,100,rx,ry,rx-90,ry-55,"#c12a23");for(let i=0;i<=100;i+=2){const a=Math.PI-Math.PI*i/100,major=i%10===0,x1=cx+Math.cos(a)*(rx-8),y1=cy-Math.sin(a)*(ry-8),x2=cx+Math.cos(a)*(rx-(major?42:27)),y2=cy-Math.sin(a)*(ry-(major?30:19));ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.strokeStyle="rgba(15,23,42,.82)";ctx.lineWidth=major?3:1.2;ctx.stroke()}[{text:"0",p:10},{text:String(Math.round(maxValue/2)),p:50},{text:String(maxValue),p:90}].forEach(l=>{const a=Math.PI-Math.PI*l.p/100,x=cx+Math.cos(a)*(rx-130),y=cy-Math.sin(a)*(ry-80);ctx.fillStyle="#111827";ctx.font="900 34px Arial";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(l.text,x,y)});ctx.fillStyle="#111827";ctx.font="900 56px Arial";ctx.textAlign="center";ctx.fillText(fmt(value),cx,cy-95);const na=Math.PI-Math.PI*pct,nx=cx+Math.cos(na)*(rx-75),ny=cy-Math.sin(na)*(ry-50);ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(nx,ny);ctx.strokeStyle="#d22121";ctx.lineWidth=9;ctx.lineCap="round";ctx.stroke();ctx.beginPath();ctx.arc(cx,cy,18,0,Math.PI*2);ctx.fillStyle="#27364a";ctx.fill();ctx.strokeStyle="#e5e7eb";ctx.lineWidth=4;ctx.stroke()}
 function updateView(){const res=calculate(),data=res.ranking,target=res.target||POINTS_PER_MONTH,leader=data[0]||{name:"-",points:0},percent=target>0?Math.min(100,leader.points/target*100):0;render(data,target);$("kpiMonths").textContent=res.months.length;$("kpiTarget").textContent=fmt(target);$("kpiLeader").textContent=leader.points>0?leader.name:"-";$("kpiLeaderPoints").textContent=fmt(leader.points||0);$("kpiPercent").textContent=percent.toFixed(1)+"%";drawGauge(leader.points||0,target);$("status").innerHTML=uploadedRows.length?`Equipos con archivo: <b>${teamFiles.size}</b>. Registros detectados: <b>${uploadedRows.length}</b>. Meses usados: <b>${res.months.join(", ")||"sin mes"}</b>. Meta calculada: <b>${fmt(target)}</b> puntos.`:`Selecciona los archivos de cada equipo y luego presiona <b>Actualizar ranking</b>.`;console.log("Meses seleccionados:",res.months);console.table(res.monthly)}
 function buildUploadGrid(){const grid=$("teamUploadGrid");grid.innerHTML="";TEAMS.forEach(team=>{const card=document.createElement("article");card.className="upload-card";card.innerHTML=`<img src="${team.logo}" alt="${team.name}" onerror="this.style.display='none'"><strong>${team.name}</strong><input type="file" accept=".xlsx,.xls,.csv" data-team="${team.name}"><div class="file-state" id="state-${norm(team.name).replace(/[^A-Z0-9]/g,"_")}">Sin archivo cargado</div>`;grid.appendChild(card);const input=card.querySelector("input");input.addEventListener("change",e=>{const file=e.target.files&&e.target.files[0];const state=card.querySelector(".file-state");if(file){teamFiles.set(team.name,file);state.textContent="Archivo listo: "+file.name;$("status").innerHTML=`Archivo asignado a <b>${team.name}</b>: ${file.name}. Puedes seguir cargando los demás equipos.`}else{teamFiles.delete(team.name);state.textContent="Sin archivo cargado"}})})}
-async function processTeamFiles(){uploadedRows=[];if(teamFiles.size===0){$("status").innerHTML='<span class="warn">No has seleccionado archivos para ningún equipo.</span>';updateView();return}$("status").innerHTML=`Leyendo ${teamFiles.size} archivo(s)...`;for(const team of TEAMS){const file=teamFiles.get(team.name);if(!file)continue;try{const rows=await readTeamFile(file,team.name);uploadedRows.push(...rows)}catch(err){console.error("Error leyendo archivo:",team.name,file.name,err);$("status").innerHTML=`<span class="warn">No se pudo leer el archivo de ${team.name}. Revisa la consola.</span>`}}updateView()}
+async function processTeamFiles(){uploadedRows=[];if(teamFiles.size===0){$("status").innerHTML='<span class="warn">No has seleccionado archivos para ningún equipo.</span>';updateView();return}$("status").innerHTML=`Leyendo ${teamFiles.size} archivo(s)...`;for(const team of TEAMS){const file=teamFiles.get(team.name);if(!file)continue;try{const rows=await readTeamFile(file,team.name);uploadedRows.push(...rows)}catch(err){console.error("Error leyendo archivo:",team.name,file.name,err);$("status").innerHTML=`<span class="warn">No se pudo leer el archivo de ${team.name}. Revisa la consola.</span>`}}if(uploadedRows.length===0){
+    $("status").innerHTML='<span class="warn">No se detectaron valores en C65/C66. Revisa que cada hoja tenga números en C65 y C66, y que el archivo esté guardado con las fórmulas calculadas.</span>';
+  }
+  updateView()}
 function clearAll(){teamFiles.clear();uploadedRows=[];document.querySelectorAll('#teamUploadGrid input[type="file"]').forEach(input=>input.value="");document.querySelectorAll(".file-state").forEach(el=>el.textContent="Sin archivo cargado");updateView()}
 buildUploadGrid();
 $("btnUpdate").addEventListener("click",processTeamFiles);

@@ -247,6 +247,20 @@
       opacity: .72;
     }
 
+
+    .corredor {
+      position: absolute;
+      top: 50%;
+      width: 42px;
+      height: 42px;
+      object-fit: contain;
+      transform: translateY(-50%);
+      z-index: 3;
+      filter: drop-shadow(0 3px 5px rgba(0,0,0,.9));
+      transition: left 1s ease;
+      pointer-events: none;
+    }
+
     .nombre {
       position: relative;
       z-index: 2;
@@ -280,6 +294,32 @@
       color: #111827;
       border: 2px solid #6c5119;
       box-shadow: inset 0 2px 8px rgba(255,255,255,.55);
+    }
+
+
+    .puntos.exceso,
+    .meta.exceso {
+      background: linear-gradient(180deg, #ff5e5e, #aa1515);
+      color: #ffffff;
+      border-color: #ffb3b3;
+      box-shadow: inset 0 2px 8px rgba(255,255,255,.35), 0 0 12px rgba(255, 0, 0, .45);
+    }
+
+    .exceso-label {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 4;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      color: #ffdddd;
+      background: rgba(170, 21, 21, .9);
+      padding: 3px 6px;
+      border-radius: 8px;
+      border: 1px solid #ffb3b3;
+      text-shadow: none;
     }
 
     .nota {
@@ -337,7 +377,21 @@
         height: 35px;
       }
 
-      .nombre {
+  
+    .corredor {
+      position: absolute;
+      top: 50%;
+      width: 42px;
+      height: 42px;
+      object-fit: contain;
+      transform: translateY(-50%);
+      z-index: 3;
+      filter: drop-shadow(0 3px 5px rgba(0,0,0,.9));
+      transition: left 1s ease;
+      pointer-events: none;
+    }
+
+    .nombre {
         font-size: 13px;
         letter-spacing: .8px;
       }
@@ -366,18 +420,18 @@
         <input type="file" id="excelInput" accept=".xlsx,.xls">
 
         <select id="cantidadMeses">
-          <option value="1">1 mes: febrero</option>
-          <option value="2">2 meses: enero + febrero</option>
-          <option value="3" selected>3 meses: enero + febrero + marzo</option>
-          <option value="4">4 meses: enero + febrero + marzo + abril</option>
-          <option value="5">5 meses: enero a mayo</option>
-          <option value="6">6 meses: enero a junio</option>
-          <option value="7">7 meses: enero a julio</option>
-          <option value="8">8 meses: enero a agosto</option>
-          <option value="9">9 meses: enero a septiembre</option>
-          <option value="10">10 meses: enero a octubre</option>
-          <option value="11">11 meses: enero a noviembre</option>
-          <option value="12">12 meses: enero a diciembre</option>
+          <option value="1">1 mes</option>
+          <option value="2">2 meses</option>
+          <option value="3" selected>3 meses</option>
+          <option value="4">4 meses</option>
+          <option value="5">5 meses</option>
+          <option value="6">6 meses</option>
+          <option value="7">7 meses</option>
+          <option value="8">8 meses</option>
+          <option value="9">9 meses</option>
+          <option value="10">10 meses</option>
+          <option value="11">11 meses</option>
+          <option value="12">12 meses</option>
         </select>
 
         <button onclick="procesarExcel()">Actualizar ranking</button>
@@ -645,24 +699,31 @@
       }
 
       contenedor.innerHTML = ranking.map((item, index) => {
-        const porcentaje = meta > 0 ? Math.min(100, (item.total / meta) * 100) : 0;
+        const avanceReal = meta > 0 ? (item.total / meta) * 100 : 0;
+        const porcentajeVisual = Math.min(100, avanceReal);
+        const tieneExceso = item.total > meta;
+        const posicionCorredor = tieneExceso
+          ? 90
+          : Math.max(3, Math.min(88, porcentajeVisual * 0.88));
 
         return `
           <div class="fila">
             <div class="posicion">${index + 1}</div>
 
             <div class="logo">
-              <img src="${item.logo}" alt="${item.equipo}" onerror="this.style.display='none'">
+              <img src="${item.logo}" alt="${item.equipo}" onerror="this.src='logos/logo_default.png'">
             </div>
 
             <div class="barra-equipo">
-              <div class="relleno" style="width:${porcentaje}%"></div>
+              <div class="relleno" style="width:${porcentajeVisual}%"></div>
+              <img class="corredor" src="${item.logo}" alt="${item.equipo}" style="left:${posicionCorredor}%;" onerror="this.src='logos/logo_default.png'">
+              ${tieneExceso ? `<span class="exceso-label">EXCESO</span>` : ``}
               <span class="nombre">${item.equipo}</span>
             </div>
 
-            <div class="puntos">${redondear(item.total)}</div>
+            <div class="puntos ${tieneExceso ? "exceso" : ""}">${redondear(item.total)}</div>
 
-            <div class="meta">${meta}</div>
+            <div class="meta ${tieneExceso ? "exceso" : ""}">${meta}</div>
           </div>
         `;
       }).join("");
@@ -700,6 +761,7 @@
       const grad = ctx.createLinearGradient(cx - radius, 0, cx + radius, 0);
       grad.addColorStop(0, "#1fc65a");
       grad.addColorStop(0.50, "#ffe14f");
+      grad.addColorStop(0.82, "#ff8c2a");
       grad.addColorStop(1, "#e5332e");
 
       ctx.lineWidth = 55;
@@ -715,14 +777,38 @@
       ctx.arc(cx, cy, radius - 38, start, end, false);
       ctx.stroke();
 
-      const pct = target > 0 ? Math.max(0, Math.min(1, value / target)) : 0;
-      const ang = start + (end - start) * pct;
+      // Marcas numéricas del medidor
+      ctx.fillStyle = "#0b1220";
+      ctx.font = "bold 24px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+
+      const marcas = [0, 25, 50, 75, 100];
+      marcas.forEach(marca => {
+        const angMarca = start + (end - start) * (marca / 100);
+        const tx = cx + Math.cos(angMarca) * (radius + 28);
+        const ty = cy + Math.sin(angMarca) * (radius + 28);
+        ctx.fillText(`${marca}%`, tx, ty);
+      });
+
+      const valor = Number(value) || 0;
+      const meta = Number(target) || 0;
+      const avance = meta > 0 ? valor / meta : 0;
+      const hayExceso = avance > 1;
+
+      /*
+        Si no llega a la meta: el puntero avanza proporcionalmente.
+        Si supera la meta: el puntero pasa un poco del límite derecho para marcar exceso.
+        Se limita a 115% visual para que no se salga demasiado del reloj.
+      */
+      const avanceVisual = hayExceso ? Math.min(avance, 1.15) : Math.max(0, avance);
+      const ang = start + (end - start) * avanceVisual;
 
       const nx = cx + Math.cos(ang) * (radius - 10);
       const ny = cy + Math.sin(ang) * (radius - 10);
 
       ctx.lineWidth = 9;
-      ctx.strokeStyle = "#dc2626";
+      ctx.strokeStyle = hayExceso ? "#b91c1c" : "#dc2626";
       ctx.lineCap = "round";
       ctx.beginPath();
       ctx.moveTo(cx, cy);
@@ -737,7 +823,13 @@
       ctx.fillStyle = "#0b1220";
       ctx.font = "bold 36px Arial";
       ctx.textAlign = "center";
-      ctx.fillText(`${redondear(value)} / ${target}`, cx, cy - radius * 0.28);
+      ctx.fillText(`${redondear(valor)} / ${meta}`, cx, cy - radius * 0.28);
+
+      if (hayExceso) {
+        ctx.fillStyle = "#b91c1c";
+        ctx.font = "bold 26px Arial";
+        ctx.fillText(`EXCESO +${redondear(valor - meta)}`, cx, cy - radius * 0.45);
+      }
     }
 
     function mostrarError(texto) {

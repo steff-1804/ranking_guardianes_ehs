@@ -1,575 +1,754 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Guardianes EHS - Formulario y Ranking</title>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<style>
-*{box-sizing:border-box}
-:root{
-  --blue:#0b1a2d; --blue2:#10284a; --line:#8fa1b8; --gold:#e0b23b; --txt:#f5f7fb;
-  --green:#1b8f4a; --dark:#07111f; --danger:#d14343;
-}
-body{
-  margin:0;min-height:100vh;background:
-  radial-gradient(circle at 12% 12%,rgba(255,255,255,.09),transparent 18%),
-  linear-gradient(135deg,#0b1220,#07101d 52%,#121a28);
-  font-family:Arial,Helvetica,sans-serif;color:var(--txt);padding:16px;display:flex;justify-content:center
-}
-.board{
-  width:min(1180px,100%);background:linear-gradient(180deg,#101f36,#071120);
-  border:5px solid #6f7a89;border-radius:12px;padding:18px;position:relative;overflow:hidden;
-  box-shadow:0 16px 50px rgba(0,0,0,.65),inset 0 0 0 2px rgba(255,255,255,.14)
-}
-.board:before{
-  content:"";position:absolute;inset:0;background-image:
-  linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),
-  linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
-  background-size:20px 20px;opacity:.55;pointer-events:none
-}
-.content{position:relative;z-index:2}
-.title{
-  background:linear-gradient(180deg,#1b4c94,#0d2a5a 65%,#071935);border:3px solid #aab8cb;
-  border-radius:8px;text-align:center;padding:14px 8px 13px;
-  box-shadow:inset 0 0 20px rgba(255,255,255,.22),0 4px 12px rgba(0,0,0,.35)
-}
-.title h1{margin:0;color:#f1d56f;letter-spacing:10px;font-size:clamp(28px,5vw,52px);line-height:1;text-shadow:0 3px 0 #06101f}
-.title h2{margin:10px 0 0;color:#fff;letter-spacing:9px;font-size:clamp(14px,2.5vw,26px);text-shadow:0 2px 0 #06101f}
-.nav{
-  margin:14px auto;display:flex;gap:10px;justify-content:center;flex-wrap:wrap
-}
-button,.btn,select,input[type="number"],input[type="text"],textarea{
-  border-radius:8px;border:2px solid #8b96a6;padding:10px 12px;font-size:15px
-}
-button,.btn{
-  border:0;font-weight:900;background:linear-gradient(180deg,#ffe37d,#d49e24);color:#101827;
-  box-shadow:0 3px 0 #806019;cursor:pointer
-}
-button.secondary{background:linear-gradient(180deg,#d8e5f7,#9fafc5)}
-button.danger{background:linear-gradient(180deg,#ff9a9a,#d14343);color:#fff;box-shadow:0 3px 0 #832626}
-button.active{outline:3px solid #fff}
-.panel{
-  background:rgba(8,15,28,.72);border:2px solid var(--line);border-radius:10px;padding:14px;margin-top:12px
-}
-.panel h3{margin:0 0 12px;text-align:center;color:#ffe27a;letter-spacing:2px;text-shadow:0 2px 0 #000}
-.form-grid{
-  display:grid;grid-template-columns:repeat(5,1fr);gap:10px;align-items:end;margin-bottom:12px
-}
-.field label{display:block;color:#dce5f3;text-transform:uppercase;font-size:12px;letter-spacing:.8px;margin-bottom:4px}
-.field input,.field select,.field textarea{width:100%;background:#edf1f7;color:#0b1220;font-weight:700}
-.field textarea{min-height:42px;resize:vertical}
-.summary-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin:12px 0}
-.kpi{
-  min-height:62px;background:linear-gradient(180deg,#1d355c,#0b1830);border:2px solid var(--line);
-  border-radius:8px;text-align:center;padding:8px;box-shadow:inset 0 0 14px rgba(255,255,255,.08)
-}
-.kpi span{display:block;color:#dce5f3;font-size:12px;letter-spacing:1px;text-transform:uppercase;margin-bottom:5px}
-.kpi strong{display:block;color:#ffe27a;font-size:clamp(18px,2.8vw,28px);text-shadow:0 2px 0 #000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.table-wrap{overflow:auto;border:2px solid #52647a;border-radius:8px;background:#0a1322}
-table{border-collapse:collapse;width:100%;min-width:1120px}
-th,td{border:1px solid rgba(255,255,255,.16);padding:6px;text-align:center}
-th{background:linear-gradient(180deg,#223c66,#10213d);color:#fff;font-size:12px;position:sticky;top:0;z-index:1}
-td:first-child,th:first-child{position:sticky;left:0;background:#10213d;z-index:2}
-td input[type="checkbox"]{width:18px;height:18px}
-td input[type="text"]{width:100%;min-width:95px;padding:6px;border:1px solid #9aa8b7}
-.status{margin-top:12px;text-align:center;color:#dfe7f4;font-size:15px}
-.warn{color:#ffd36b;font-weight:800}
-.ok{color:#99f6b5;font-weight:800}
-.logo-small{width:46px;height:46px;object-fit:contain;filter:drop-shadow(0 2px 4px rgba(0,0,0,.85))}
-.gauge-frame{width:min(740px,100%);margin:12px auto;padding:10px;background:linear-gradient(180deg,#aeb8c4,#536170 48%,#1b2838 49%,#0d1726);border:3px solid #697585;border-radius:8px;box-shadow:inset 0 0 25px rgba(0,0,0,.55)}
-.gauge-box{height:225px;background:linear-gradient(180deg,#eff2f6,#c8ced6);border:3px solid #3f4954;border-radius:6px;overflow:hidden}
-#gaugeCanvas{width:100%;height:100%;display:block}
-.ranking{display:grid;gap:9px}
-.row{display:grid;grid-template-columns:55px 70px 1fr 90px 120px;gap:10px;align-items:center;min-height:58px}
-.pos{width:46px;height:46px;border-radius:50%;border:3px solid rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;font-size:25px;font-weight:900;color:white;text-shadow:0 2px 2px #000;justify-self:center;box-shadow:inset 0 2px 8px rgba(255,255,255,.35),0 2px 7px rgba(0,0,0,.65)}
-.row:nth-child(1) .pos{background:linear-gradient(180deg,#f5d140,#936707)}.row:nth-child(2) .pos{background:linear-gradient(180deg,#d7dce4,#697381)}.row:nth-child(3) .pos{background:linear-gradient(180deg,#d7863a,#713a16)}.row:nth-child(4) .pos{background:linear-gradient(180deg,#171717,#000)}.row:nth-child(5) .pos{background:linear-gradient(180deg,#35b85d,#0c662f)}.row:nth-child(6) .pos{background:linear-gradient(180deg,#ad4bc9,#602475)}.row:nth-child(7) .pos{background:linear-gradient(180deg,#30a5de,#075b8b)}.row:nth-child(8) .pos{background:linear-gradient(180deg,#5ebe83,#276e48)}
-.logo{height:54px;display:flex;align-items:center;justify-content:center}.logo img{max-width:66px;max-height:58px;object-fit:contain;filter:drop-shadow(0 2px 4px rgba(0,0,0,.85))}
-.track{height:42px;border-radius:22px;background:linear-gradient(180deg,#677382,#283340 48%,#151c27 52%,#090f18);border:2px solid #99a5b5;box-shadow:inset 0 4px 10px rgba(0,0,0,.65),0 1px 4px rgba(255,255,255,.18);display:flex;align-items:center;padding:0 18px 0 58px;position:relative;overflow:hidden}
-.fill{position:absolute;left:0;top:0;bottom:0;width:0;background:linear-gradient(90deg,rgba(25,168,75,.75),rgba(229,184,63,.7));border-radius:22px;transition:width 1s ease;opacity:.7}
-.runner{position:absolute;top:50%;left:6px;width:44px;height:44px;object-fit:contain;transform:translateY(-50%);transition:left 1s ease;z-index:3;filter:drop-shadow(0 3px 5px rgba(0,0,0,.9))}
-.finish{position:absolute;right:8px;top:5px;bottom:5px;width:5px;background:repeating-linear-gradient(180deg,#fff 0 5px,#111 5px 10px);border-radius:4px;opacity:.9;z-index:2}
-.name{position:relative;z-index:2;font-size:clamp(15px,2.2vw,24px);font-weight:900;letter-spacing:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 2px 2px #000}
-.score,.target{height:42px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900}
-.score{background:linear-gradient(180deg,#252d39,#080d16);border:2px solid #99a5b5}
-.target{background:linear-gradient(180deg,#ffe58a,#d8a736 58%,#b8891f);color:#111827;border:2px solid #6c5119;box-shadow:inset 0 2px 8px rgba(255,255,255,.55)}
-.hidden{display:none!important}
-@media(max-width:900px){.form-grid,.summary-grid{grid-template-columns:repeat(2,1fr)}.title h1{letter-spacing:5px}.title h2{letter-spacing:4px}.row{grid-template-columns:38px 48px 1fr 58px 76px;gap:5px}.pos{width:34px;height:34px;font-size:18px}.logo img{max-width:46px;max-height:42px}.track,.score,.target{height:34px}.track{padding-left:42px}.runner{width:32px;height:32px}.name{font-size:13px;letter-spacing:.8px}.score,.target{font-size:13px}.kpi{min-height:54px}}
-</style>
+  <meta charset="UTF-8">
+  <title>Guardianes EHS - Ranking Total Marathon</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Librería para leer Excel en el navegador -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, Helvetica, sans-serif;
+      color: white;
+      background:
+        linear-gradient(rgba(7,17,32,.94), rgba(2,8,18,.98)),
+        repeating-linear-gradient(0deg, transparent 0, transparent 23px, rgba(110,150,210,.08) 24px),
+        repeating-linear-gradient(90deg, transparent 0, transparent 23px, rgba(110,150,210,.08) 24px),
+        radial-gradient(circle at top, #18345a 0%, #07111f 55%, #020711 100%);
+    }
+
+    .contenedor {
+      width: 100%;
+      min-height: 100vh;
+      padding: 18px;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+    }
+
+    .panel {
+      width: 100%;
+      max-width: 980px;
+      background: linear-gradient(180deg, #07162c, #020914);
+      border: 4px solid #536987;
+      border-radius: 10px;
+      padding: 18px;
+      box-shadow:
+        0 0 35px rgba(0,0,0,.9),
+        inset 0 0 25px rgba(80,130,200,.23);
+    }
+
+    .encabezado {
+      text-align: center;
+      padding: 15px 10px;
+      border: 2px solid #7fa8df;
+      border-radius: 8px;
+      background: linear-gradient(180deg, #173e75, #061a39);
+      box-shadow: inset 0 0 18px rgba(173,216,255,.35);
+      margin-bottom: 14px;
+    }
+
+    .encabezado h1 {
+      margin: 0;
+      color: #f5d86d;
+      font-size: clamp(28px, 5vw, 48px);
+      letter-spacing: 9px;
+      text-shadow: 0 3px 5px #000;
+    }
+
+    .encabezado h2 {
+      margin: 5px 0 0;
+      color: white;
+      font-size: clamp(17px, 3vw, 27px);
+      letter-spacing: 6px;
+      text-shadow: 0 3px 5px #000;
+    }
+
+    .barra-control {
+      display: grid;
+      grid-template-columns: 1fr 220px 170px;
+      gap: 10px;
+      border: 1px solid #7186a7;
+      border-radius: 6px;
+      background: rgba(5,12,25,.75);
+      padding: 10px;
+      margin-bottom: 12px;
+    }
+
+    input[type="file"],
+    select,
+    button {
+      width: 100%;
+      border-radius: 7px;
+      border: 1px solid #8ea1c8;
+      padding: 10px;
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    input[type="file"],
+    select {
+      background: #e9eef7;
+      color: #0b1220;
+    }
+
+    button {
+      border: none;
+      background: linear-gradient(180deg, #ffe275, #c99724);
+      color: #101010;
+      cursor: pointer;
+      text-transform: uppercase;
+      box-shadow: 0 3px 0 #72510d;
+    }
+
+    button:hover { filter: brightness(1.08); }
+
+    .indicadores {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 9px;
+      margin: 10px 0 16px;
+    }
+
+    .tarjeta {
+      border: 1px solid #6580a5;
+      border-radius: 6px;
+      background: linear-gradient(180deg, #183456, #071426);
+      padding: 9px 5px;
+      text-align: center;
+      box-shadow: inset 0 0 12px rgba(120,170,240,.18);
+    }
+
+    .tarjeta small {
+      display: block;
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      color: #ffffff;
+      margin-bottom: 5px;
+      text-transform: uppercase;
+    }
+
+    .tarjeta strong {
+      display: block;
+      color: #ffdf4d;
+      font-size: clamp(18px, 2.5vw, 24px);
+      text-shadow: 0 2px 3px #000;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .medidor {
+      width: min(720px, 100%);
+      margin: 12px auto 18px;
+      padding: 10px;
+      border: 3px solid #697585;
+      border-radius: 8px;
+      background: linear-gradient(180deg, #aeb8c4, #536170 48%, #1b2838 49%, #0d1726);
+      box-shadow: inset 0 0 25px rgba(0,0,0,.55);
+    }
+
+    .medidor-interior {
+      height: 210px;
+      background: linear-gradient(180deg, #eff2f6, #c8ced6);
+      border: 3px solid #3f4954;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    #gaugeCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .ranking {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .fila {
+      display: grid;
+      grid-template-columns: 55px 70px 1fr 95px 115px;
+      gap: 10px;
+      align-items: center;
+      min-height: 58px;
+    }
+
+    .posicion {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      border: 3px solid rgba(255,255,255,.75);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 25px;
+      font-weight: 900;
+      color: #fff;
+      text-shadow: 0 2px 2px #000;
+      justify-self: center;
+      box-shadow: inset 0 2px 8px rgba(255,255,255,.35), 0 2px 7px rgba(0,0,0,.65);
+      background: linear-gradient(180deg, #222, #000);
+    }
+
+    .fila:nth-child(1) .posicion { background: linear-gradient(180deg, #f5d140, #936707); }
+    .fila:nth-child(2) .posicion { background: linear-gradient(180deg, #d7dce4, #697381); }
+    .fila:nth-child(3) .posicion { background: linear-gradient(180deg, #d7863a, #713a16); }
+    .fila:nth-child(4) .posicion { background: linear-gradient(180deg, #171717, #000); }
+    .fila:nth-child(5) .posicion { background: linear-gradient(180deg, #35b85d, #0c662f); }
+    .fila:nth-child(6) .posicion { background: linear-gradient(180deg, #ad4bc9, #602475); }
+    .fila:nth-child(7) .posicion { background: linear-gradient(180deg, #30a5de, #075b8b); }
+    .fila:nth-child(8) .posicion { background: linear-gradient(180deg, #5ebe83, #276e48); }
+
+    .logo {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 56px;
+    }
+
+    .logo img {
+      max-width: 66px;
+      max-height: 58px;
+      object-fit: contain;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,.85));
+    }
+
+    .barra-equipo {
+      height: 42px;
+      border-radius: 22px;
+      background: linear-gradient(180deg, #677382, #283340 48%, #151c27 52%, #090f18);
+      border: 2px solid #99a5b5;
+      box-shadow: inset 0 4px 10px rgba(0,0,0,.65), 0 1px 4px rgba(255,255,255,.18);
+      display: flex;
+      align-items: center;
+      padding: 0 18px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .relleno {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 0;
+      background: linear-gradient(90deg, rgba(25,168,75,.75), rgba(229,184,63,.7));
+      border-radius: 22px;
+      transition: width 1s ease;
+      opacity: .72;
+    }
+
+    .nombre {
+      position: relative;
+      z-index: 2;
+      font-size: clamp(15px, 2.2vw, 23px);
+      font-weight: 900;
+      letter-spacing: 3px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-shadow: 0 2px 2px #000;
+    }
+
+    .puntos,
+    .meta {
+      height: 42px;
+      border-radius: 14px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 22px;
+      font-weight: 900;
+    }
+
+    .puntos {
+      background: linear-gradient(180deg, #252d39, #080d16);
+      border: 2px solid #99a5b5;
+    }
+
+    .meta {
+      background: linear-gradient(180deg, #ffe58a, #d8a736 58%, #b8891f);
+      color: #111827;
+      border: 2px solid #6c5119;
+      box-shadow: inset 0 2px 8px rgba(255,255,255,.55);
+    }
+
+    .nota {
+      text-align: center;
+      color: #dfe7f4;
+      line-height: 1.45;
+      margin: 12px auto 8px;
+      max-width: 830px;
+      font-size: 14px;
+    }
+
+    .error {
+      background: #7c1616;
+      border: 1px solid #ff7777;
+      border-radius: 8px;
+      padding: 12px;
+      margin: 12px 0;
+      text-align: center;
+      font-weight: 800;
+    }
+
+    .sin-datos {
+      text-align: center;
+      padding: 36px;
+      color: #b8c8e8;
+      border: 2px dashed #4c6388;
+      border-radius: 10px;
+    }
+
+    @media (max-width: 820px) {
+      .barra-control,
+      .indicadores {
+        grid-template-columns: 1fr;
+      }
+
+      .fila {
+        grid-template-columns: 38px 48px 1fr 60px 72px;
+        gap: 5px;
+      }
+
+      .posicion {
+        width: 34px;
+        height: 34px;
+        font-size: 18px;
+      }
+
+      .logo img {
+        max-width: 46px;
+        max-height: 42px;
+      }
+
+      .barra-equipo,
+      .puntos,
+      .meta {
+        height: 35px;
+      }
+
+      .nombre {
+        font-size: 13px;
+        letter-spacing: .8px;
+      }
+
+      .puntos,
+      .meta {
+        font-size: 13px;
+      }
+
+      .encabezado h1 { letter-spacing: 4px; }
+      .encabezado h2 { letter-spacing: 3px; }
+    }
+  </style>
 </head>
+
 <body>
-<main class="board"><section class="content">
-<header class="title"><h1>GUARDIANES EHS</h1><h2>MARATÓN EHS</h2></header>
+  <main class="contenedor">
+    <section class="panel">
 
-<nav class="nav">
-  <button id="btnFormView" class="active">Llenar información</button>
-  <button id="btnRankingView" class="secondary">Ir al ranking</button>
-  <button id="btnDownload" class="secondary">Descargar Excel</button>
-  <button id="btnClearAll" class="danger">Borrar datos guardados</button>
-</nav>
+      <header class="encabezado">
+        <h1>GUARDIANES EHS</h1>
+        <h2>MARATÓN EHS</h2>
+      </header>
 
-<section id="formView" class="panel">
-  <h3>FORMULARIO DE CALIFICACIÓN MENSUAL</h3>
+      <section class="barra-control">
+        <input type="file" id="excelInput" accept=".xlsx,.xls">
 
-  <div class="form-grid">
-    <div class="field">
-      <label>Equipo</label>
-      <select id="teamSelect"></select>
-    </div>
-    <div class="field">
-      <label>Mes</label>
-      <select id="monthSelect"></select>
-    </div>
-    <div class="field">
-      <label>Capitán</label>
-      <input id="captainInput" type="text" placeholder="Nombre del capitán">
-    </div>
-    <div class="field">
-      <label>P obtenido</label>
-      <input id="pointsInput" type="number" min="0" max="100" step="1" placeholder="Ej: 96">
-    </div>
-    <div class="field">
-      <label>Puntos adicionales</label>
-      <input id="extraInput" type="number" min="0" step="1" placeholder="Ej: 2">
-    </div>
-  </div>
+        <select id="cantidadMeses">
+          <option value="1">1 mes: febrero</option>
+          <option value="2">2 meses: enero + febrero</option>
+          <option value="3" selected>3 meses: enero + febrero + marzo</option>
+          <option value="4">4 meses: enero + febrero + marzo + abril</option>
+          <option value="5">5 meses: enero a mayo</option>
+          <option value="6">6 meses: enero a junio</option>
+          <option value="7">7 meses: enero a julio</option>
+          <option value="8">8 meses: enero a agosto</option>
+          <option value="9">9 meses: enero a septiembre</option>
+          <option value="10">10 meses: enero a octubre</option>
+          <option value="11">11 meses: enero a noviembre</option>
+          <option value="12">12 meses: enero a diciembre</option>
+        </select>
 
-  <div class="form-grid">
-    <div class="field">
-      <label>Máximo del mes</label>
-      <input id="maxInput" type="number" min="1" step="1" value="100">
-    </div>
-    <div class="field" style="grid-column:span 2">
-      <label>Motivo puntos adicionales</label>
-      <textarea id="extraReasonInput" placeholder="Describe por qué recibe puntos adicionales"></textarea>
-    </div>
-    <div class="field" style="grid-column:span 2">
-      <label>Observaciones</label>
-      <textarea id="obsInput" placeholder="Comentarios o novedades del mes"></textarea>
-    </div>
-  </div>
+        <button onclick="procesarExcel()">Actualizar ranking</button>
+      </section>
 
-  <div class="summary-grid">
-    <div class="kpi"><span>Equipo actual</span><strong id="formTeam">-</strong></div>
-    <div class="kpi"><span>Mes actual</span><strong id="formMonth">-</strong></div>
-    <div class="kpi"><span>P obtenido</span><strong id="formBase">0</strong></div>
-    <div class="kpi"><span>Adicional</span><strong id="formExtra">0</strong></div>
-    <div class="kpi"><span>Total mes</span><strong id="formTotal">0</strong></div>
-    <div class="kpi"><span>Total equipo guardado</span><strong id="formTeamTotal">0</strong></div>
-  </div>
+      <p class="nota">
+        Esta versión lee un solo archivo Excel, específicamente la hoja <strong>Total de marathon</strong>.
+        Detecta cada bloque de equipo, toma los valores de <strong>PUNTAJE OBTENIDO</strong> por mes y genera el ranking.
+      </p>
 
-  <div class="table-wrap">
-    <table id="dailyTable"></table>
-  </div>
+      <section class="indicadores">
+        <div class="tarjeta"><small>Meses leídos</small><strong id="kpiMeses">0</strong></div>
+        <div class="tarjeta"><small>Meta</small><strong id="kpiMeta">0</strong></div>
+        <div class="tarjeta"><small>Equipo líder</small><strong id="kpiLider">-</strong></div>
+        <div class="tarjeta"><small>Puntos líder</small><strong id="kpiPuntos">0</strong></div>
+        <div class="tarjeta"><small>Avance líder</small><strong id="kpiAvance">0%</strong></div>
+      </section>
 
-  <div class="nav">
-    <button id="btnSave">Guardar información</button>
-    <button id="btnNextMonth" class="secondary">Guardar y llenar siguiente mes</button>
-    <button id="btnLoadSaved" class="secondary">Cargar guardado</button>
-    <button id="btnClearCurrent" class="danger">Limpiar mes actual</button>
-  </div>
+      <section class="medidor">
+        <div class="medidor-interior">
+          <canvas id="gaugeCanvas" width="1000" height="300"></canvas>
+        </div>
+      </section>
 
-  <div id="formStatus" class="status">Llena un equipo y un mes. Presiona <b>Guardar información</b>. Luego cambia a otro mes o a otro equipo y vuelve a guardar.</div>
+      <section id="ranking" class="ranking">
+        <div class="sin-datos">
+          Sube el archivo Excel maestro para generar el ranking.
+        </div>
+      </section>
 
-  <div class="panel" style="margin-top:14px">
-    <h3>REGISTROS GUARDADOS</h3>
-    <div class="status">Aquí se ve cada equipo y mes guardado. Puedes cambiar de equipo/mes arriba para llenar otro registro.</div>
-    <div class="table-wrap" style="margin-top:10px">
-      <table id="savedRecordsTable"></table>
-    </div>
-  </div>
-</section>
+      <div id="mensajeError"></div>
 
-<section id="rankingView" class="panel hidden">
-  <h3>RANKING GUARDIANES EHS</h3>
+    </section>
+  </main>
 
-  <div class="nav">
-    <select id="rankingMonthMode">
-      <option value="1">Ver 1 mes desde febrero</option>
-      <option value="2" selected>Ver 2 meses desde febrero</option>
-      <option value="3">Ver 3 meses desde febrero</option>
-      <option value="4">Ver 4 meses desde febrero</option>
-      <option value="5">Ver 5 meses desde febrero</option>
-      <option value="6">Ver 6 meses desde febrero</option>
-      <option value="7">Ver 7 meses desde febrero</option>
-      <option value="8">Ver 8 meses desde febrero</option>
-      <option value="9">Ver 9 meses desde febrero</option>
-      <option value="10">Ver 10 meses desde febrero</option>
-      <option value="11">Ver 11 meses desde febrero</option>
-      <option value="12">Ver 12 meses desde febrero</option>
-    </select>
-    <button id="btnRefreshRanking">Actualizar ranking</button>
-  </div>
+  <script>
+    const MONTHS = [
+      "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
+      "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"
+    ];
 
-  <div class="gauge-frame"><div class="gauge-box"><canvas id="gaugeCanvas" width="1000" height="300"></canvas></div></div>
+    const TEAM_LOGOS = {
+      "1RX": "logos/logo_1rx.png",
+      "CAI": "logos/logo_cai.png",
+      "CALIDAD": "logos/logo_calidad.png",
+      "CND": "logos/logo_cnd.png",
+      "LOS 20KG": "logos/logo_los_20kg.png",
+      "LOS CIENTIFICOS": "logos/logo_los_cientificos.png",
+      "SOLVENTE": "logos/logo_solvente.png",
+      "WATER BASE": "logos/logo_water_base.png"
+    };
 
-  <section class="summary-grid">
-    <div class="kpi"><span>Meses leídos</span><strong id="kpiMonths">0</strong></div>
-    <div class="kpi"><span>Meta ranking</span><strong id="kpiTarget">0</strong></div>
-    <div class="kpi"><span>Total puntos</span><strong id="kpiTotalPoints">0</strong></div>
-    <div class="kpi"><span>Equipo líder</span><strong id="kpiLeader">-</strong></div>
-    <div class="kpi"><span>Puntos líder</span><strong id="kpiLeaderPoints">0</strong></div>
-    <div class="kpi"><span>Avance líder</span><strong id="kpiPercent">0%</strong></div>
-  </section>
+    let datosEquipos = [];
 
-  <section id="ranking" class="ranking"></section>
-  <div id="rankingStatus" class="status">El ranking se genera con la información guardada en esta página.</div>
-</section>
-
-</section></main>
-
-<script>
-const STORAGE_KEY="guardianes_ehs_registros_v2";
-const POINTS_PER_MONTH=100;
-const MONTHS=["FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE","ENERO"];
-const TEAMS=[
-{name:"1RX",logo:"logos/logo_1rx.png"},
-{name:"LOS CIENTIFICOS",logo:"logos/logo_los_cientificos.png"},
-{name:"CAI",logo:"logos/logo_cai.png"},
-{name:"CND",logo:"logos/logo_cnd.png"},
-{name:"LOS 20KG",logo:"logos/logo_los_20kg.png"},
-{name:"SOLVENTE",logo:"logos/logo_solvente.png"},
-{name:"WATER BASE",logo:"logos/logo_water_base.png"},
-{name:"CALIDAD",logo:"logos/logo_calidad.png"}
-];
-const DAILY_COLS=[
-  {key:"arranque_1",label:"Arranque 1er"},
-  {key:"arranque_2",label:"Arranque 2do"},
-  {key:"arranque_3",label:"Arranque 3er"},
-  {key:"smart_comportamiento",label:"SMART Comport."},
-  {key:"smart_condicion",label:"SMART Condición"},
-  {key:"gemba",label:"Gemba"},
-  {key:"charla_1",label:"Charla 1er"},
-  {key:"charla_2",label:"Charla 2do"},
-  {key:"charla_3",label:"Charla 3er"},
-  {key:"pausa_1",label:"Pausa 1er"},
-  {key:"pausa_2",label:"Pausa 2do"},
-  {key:"pausa_3",label:"Pausa 3er"},
-  {key:"inspeccion",label:"Inspección EHS"},
-  {key:"near_miss",label:"Near miss"}
-];
-
-function $(id){return document.getElementById(id)}
-function fmt(n){return Math.round(Number(n)||0).toLocaleString("es-EC")}
-function key(team,month){return team+"||"+month}
-function emptyDay(day){const o={day};DAILY_COLS.forEach(c=>o[c.key]=false);o.note="";return o}
-function defaultRecord(team,month){
-  return {team,month,captain:"",points:0,extra:0,extraReason:"",max:100,observations:"",days:Array.from({length:31},(_,i)=>emptyDay(i+1)),updatedAt:new Date().toISOString()}
-}
-function getStore(){
-  try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||"{}")}catch(e){return{}}
-}
-function setStore(data){localStorage.setItem(STORAGE_KEY,JSON.stringify(data))}
-function currentKey(){return key($("teamSelect").value,$("monthSelect").value)}
-function getCurrentRecord(){
-  const data=getStore();
-  return data[currentKey()]||defaultRecord($("teamSelect").value,$("monthSelect").value)
-}
-
-function initSelectors(){
-  $("teamSelect").innerHTML=TEAMS.map(t=>`<option value="${t.name}">${t.name}</option>`).join("");
-  $("monthSelect").innerHTML=MONTHS.map(m=>`<option value="${m}">${m}</option>`).join("");
-}
-
-function buildDailyTable(){
-  const table=$("dailyTable");
-  const headers=["DÍA",...DAILY_COLS.map(c=>c.label),"Observación"];
-  table.innerHTML="<thead><tr>"+headers.map(h=>`<th>${h}</th>`).join("")+"</tr></thead><tbody>"+
-  Array.from({length:31},(_,i)=>{
-    const day=i+1;
-    return `<tr data-day="${day}"><td>${day}</td>`+
-      DAILY_COLS.map(c=>`<td><input type="checkbox" data-col="${c.key}"></td>`).join("")+
-      `<td><input type="text" data-col="note" placeholder="Feriado, fin de semana, novedad"></td></tr>`;
-  }).join("")+"</tbody>";
-}
-
-function loadRecordToForm(record){
-  $("captainInput").value=record.captain||"";
-  $("pointsInput").value=record.points||0;
-  $("extraInput").value=record.extra||0;
-  $("extraReasonInput").value=record.extraReason||"";
-  $("maxInput").value=record.max||100;
-  $("obsInput").value=record.observations||"";
-
-  const days=record.days||Array.from({length:31},(_,i)=>emptyDay(i+1));
-  document.querySelectorAll("#dailyTable tbody tr").forEach((tr,idx)=>{
-    const d=days[idx]||emptyDay(idx+1);
-    DAILY_COLS.forEach(c=>{
-      const input=tr.querySelector(`input[data-col="${c.key}"]`);
-      if(input) input.checked=!!d[c.key];
+    document.getElementById("cantidadMeses").addEventListener("change", () => {
+      if (datosEquipos.length) actualizarRanking();
+      else actualizarKPIs([], obtenerMesesSeleccionados());
     });
-    const note=tr.querySelector('input[data-col="note"]');
-    if(note) note.value=d.note||"";
-  });
-  updateFormKpis();
-}
 
-function collectRecordFromForm(){
-  const team=$("teamSelect").value, month=$("monthSelect").value;
-  const days=[];
-  document.querySelectorAll("#dailyTable tbody tr").forEach((tr,idx)=>{
-    const d=emptyDay(idx+1);
-    DAILY_COLS.forEach(c=>{
-      const input=tr.querySelector(`input[data-col="${c.key}"]`);
-      d[c.key]=!!(input&&input.checked);
-    });
-    const note=tr.querySelector('input[data-col="note"]');
-    d.note=note?note.value.trim():"";
-    days.push(d);
-  });
-  return {
-    team,month,
-    captain:$("captainInput").value.trim(),
-    points:Number($("pointsInput").value)||0,
-    extra:Number($("extraInput").value)||0,
-    extraReason:$("extraReasonInput").value.trim(),
-    max:Number($("maxInput").value)||100,
-    observations:$("obsInput").value.trim(),
-    days,
-    updatedAt:new Date().toISOString()
-  };
-}
+    function normalizarTexto(valor) {
+      if (valor === null || valor === undefined) return "";
 
-function updateFormKpis(){
-  const base=Number($("pointsInput").value)||0;
-  const extra=Number($("extraInput").value)||0;
-  const team=$("teamSelect").value;
-  const data=getStore();
-  const savedTeamTotal=Object.values(data)
-    .filter(r=>r.team===team)
-    .reduce((acc,r)=>acc+(Number(r.points)||0)+(Number(r.extra)||0),0);
+      return String(valor)
+        .trim()
+        .toUpperCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, " ");
+    }
 
-  $("formTeam").textContent=team;
-  $("formMonth").textContent=$("monthSelect").value;
-  $("formBase").textContent=fmt(base);
-  $("formExtra").textContent=fmt(extra);
-  $("formTotal").textContent=fmt(base+extra);
-  $("formTeamTotal").textContent=fmt(savedTeamTotal);
-}
+    function obtenerNumero(valor) {
+      if (valor === null || valor === undefined || valor === "") return 0;
+      if (typeof valor === "number") return valor;
 
-function saveCurrent(){
-  const rec=collectRecordFromForm();
-  const data=getStore();
-  data[key(rec.team,rec.month)]=rec;
-  setStore(data);
-  $("formStatus").innerHTML=`<span class="ok">Guardado:</span> ${rec.team} - ${rec.month}. Total mes: <b>${fmt(rec.points+rec.extra)}</b>`;
-  renderSavedRecords();
-  updateFormKpis();
-  refreshRanking();
-}
+      const texto = String(valor).replace(",", ".");
+      const match = texto.match(/-?\d+(\.\d+)?/);
 
-function saveAndNextMonth(){
-  saveCurrent();
-  const currentIndex=MONTHS.indexOf($("monthSelect").value);
-  const nextIndex=(currentIndex+1)%MONTHS.length;
-  $("monthSelect").value=MONTHS[nextIndex];
-  loadCurrent();
-  $("formStatus").innerHTML+=`<br>Listo. Ahora puedes llenar <b>${$("teamSelect").value}</b> - <b>${$("monthSelect").value}</b>.`;
-}
+      return match ? Number(match[0]) : 0;
+    }
 
-function renderSavedRecords(){
-  const table=$("savedRecordsTable");
-  if(!table) return;
+    function redondear(numero) {
+      return Math.round((Number(numero) + Number.EPSILON) * 100) / 100;
+    }
 
-  const records=Object.values(getStore()).sort((a,b)=>{
-    const teamCompare=String(a.team).localeCompare(String(b.team));
-    if(teamCompare!==0) return teamCompare;
-    return MONTHS.indexOf(a.month)-MONTHS.indexOf(b.month);
-  });
+    function corregirNombreEquipo(nombre) {
+      const n = normalizarTexto(nombre);
 
-  if(records.length===0){
-    table.innerHTML="<thead><tr><th>Estado</th></tr></thead><tbody><tr><td>No hay registros guardados todavía.</td></tr></tbody>";
-    return;
-  }
+      if (n.includes("1RX")) return "1RX";
+      if (n.includes("CAI")) return "CAI";
+      if (n.includes("CALIDAD")) return "CALIDAD";
+      if (n.includes("CND")) return "CND";
+      if (n.includes("20KG") || n.includes("20 KG") || n.includes("LOST 20KG")) return "LOS 20KG";
+      if (n.includes("CIENTIF")) return "LOS CIENTIFICOS";
+      if (n.includes("SOLVENTE")) return "SOLVENTE";
+      if (n.includes("WATER") || n.includes("BASE")) return "WATER BASE";
 
-  table.innerHTML="<thead><tr><th>Equipo</th><th>Mes</th><th>P obtenido</th><th>Adicional</th><th>Total</th><th>Motivo adicional</th><th>Actualizado</th><th>Acción</th></tr></thead><tbody>"+
-    records.map(r=>{
-      const total=(Number(r.points)||0)+(Number(r.extra)||0);
-      const safeTeam=String(r.team).replace(/"/g,"&quot;");
-      const safeMonth=String(r.month).replace(/"/g,"&quot;");
-      return `<tr>
-        <td>${r.team}</td>
-        <td>${r.month}</td>
-        <td>${fmt(r.points||0)}</td>
-        <td>${fmt(r.extra||0)}</td>
-        <td><b>${fmt(total)}</b></td>
-        <td>${r.extraReason||""}</td>
-        <td>${r.updatedAt?new Date(r.updatedAt).toLocaleString("es-EC"):""}</td>
-        <td><button class="secondary" type="button" onclick="editSavedRecord('${safeTeam}','${safeMonth}')">Editar</button></td>
-      </tr>`;
-    }).join("")+"</tbody>";
-}
+      return n || "SIN NOMBRE";
+    }
 
-function editSavedRecord(team,month){
-  $("teamSelect").value=team;
-  $("monthSelect").value=month;
-  loadCurrent();
-  showView("form");
-  $("formStatus").innerHTML=`Editando registro guardado: <b>${team}</b> - <b>${month}</b>.`;
-}
+    function obtenerLogo(nombreEquipo) {
+      return TEAM_LOGOS[nombreEquipo] || "logos/logo_default.png";
+    }
 
-function loadCurrent(){
-  loadRecordToForm(getCurrentRecord());
-  $("formStatus").innerHTML=`Cargado: <b>${$("teamSelect").value}</b> - <b>${$("monthSelect").value}</b>.`;
-}
+    function obtenerMesesSeleccionados() {
+      const cantidad = Number(document.getElementById("cantidadMeses").value);
 
-function clearCurrent(){
-  const data=getStore();
-  delete data[currentKey()];
-  setStore(data);
-  loadRecordToForm(defaultRecord($("teamSelect").value,$("monthSelect").value));
-  renderSavedRecords();
-  refreshRanking();
-  $("formStatus").innerHTML=`Formulario limpio para <b>${$("teamSelect").value}</b> - <b>${$("monthSelect").value}</b>.`;
-}
+      /*
+        Según tu pedido:
+        - 1 mes = FEBRERO
+        - 2 meses = ENERO + FEBRERO
+        - 3 meses = ENERO + FEBRERO + MARZO
+        - 4 meses = ENERO + FEBRERO + MARZO + ABRIL
+      */
+      if (cantidad === 1) return ["FEBRERO"];
 
-function clearAll(){
-  if(!confirm("¿Seguro que deseas borrar todos los datos guardados en esta página?")) return;
-  localStorage.removeItem(STORAGE_KEY);
-  loadCurrent();
-  renderSavedRecords();
-  refreshRanking();
-  $("formStatus").innerHTML='<span class="warn">Se borraron todos los datos guardados.</span>';
-}
+      return MONTHS.slice(0, cantidad);
+    }
 
-function showView(view){
-  $("formView").classList.toggle("hidden",view!=="form");
-  $("rankingView").classList.toggle("hidden",view!=="ranking");
-  $("btnFormView").classList.toggle("active",view==="form");
-  $("btnRankingView").classList.toggle("active",view==="ranking");
-  if(view==="ranking") refreshRanking();
-}
+    function encontrarHojaTotal(workbook) {
+      const hoja = workbook.SheetNames.find(nombre => {
+        const n = normalizarTexto(nombre);
+        return n.includes("TOTAL") && n.includes("MARATHON");
+      });
 
-function getSelectedMonths(){
-  const count=Number($("rankingMonthMode").value)||2;
-  return MONTHS.slice(0,count);
-}
+      return hoja || workbook.SheetNames[0];
+    }
 
-function getRankingData(){
-  const data=getStore();
-  const months=getSelectedMonths();
-  const target=months.length*POINTS_PER_MONTH;
-  const rows=Object.values(data).filter(r=>months.includes(r.month));
-  const totals=new Map();
-  TEAMS.forEach(t=>totals.set(t.name,{...t,points:0,target}));
-  rows.forEach(r=>{
-    const item=totals.get(r.team);
-    if(item) item.points += (Number(r.points)||0)+(Number(r.extra)||0);
-  });
-  const ranking=[...totals.values()].sort((a,b)=>b.points-a.points||a.name.localeCompare(b.name));
-  return {months,target,rows,ranking};
-}
+    function extraerDatosTotalMarathon(matriz) {
+      const equipos = [];
 
-function refreshRanking(){
-  const res=getRankingData();
-  renderRanking(res.ranking,res.target);
-  const leader=res.ranking[0]||{name:"-",points:0};
-  const percent=res.target>0?Math.min(100,(leader.points/res.target)*100):0;
-  $("kpiMonths").textContent=res.months.length;
-  $("kpiTarget").textContent=fmt(res.target);
-  $("kpiTotalPoints").textContent=fmt(res.ranking.reduce((acc,r)=>acc+(Number(r.points)||0),0));
-  $("kpiLeader").textContent=leader.points>0?leader.name:"-";
-  $("kpiLeaderPoints").textContent=fmt(leader.points||0);
-  $("kpiPercent").textContent=percent.toFixed(1)+"%";
-  $("rankingStatus").innerHTML=`Registros guardados usados: <b>${res.rows.length}</b>. Meses: <b>${res.months.join(", ")}</b>.`;
-  drawGauge(leader.points||0,res.target||POINTS_PER_MONTH);
-}
+      for (let fila = 0; fila < matriz.length - 2; fila++) {
+        for (let col = 0; col < (matriz[fila] || []).length - 1; col++) {
+          const posibleEquipo = normalizarTexto(matriz[fila][col]);
+          const abajoIzq = normalizarTexto(matriz[fila + 1]?.[col]);
+          const abajoDer = normalizarTexto(matriz[fila + 1]?.[col + 1]);
 
-function renderRanking(data,target){
-  const root=$("ranking"); root.innerHTML="";
-  const raceMax=Math.max(1,target);
-  data.forEach((team,i)=>{
-    const progress=Math.max(0,Math.min(100,((team.points||0)/raceMax)*100));
-    const logoLeft=Math.max(6,Math.min(86,progress*.86));
-    const row=document.createElement("article");
-    row.className="row";
-    row.innerHTML=`<div class="pos">${i+1}</div>
-      <div class="logo"><img src="${team.logo}" alt="${team.name}" onerror="this.style.display='none'"></div>
-      <div class="track">
-        <div class="fill" style="width:${progress}%"></div>
-        <img class="runner" src="${team.logo}" alt="${team.name}" style="left:${logoLeft}%" onerror="this.style.display='none'">
-        <span class="name">${team.name}</span><div class="finish"></div>
-      </div>
-      <div class="score">${fmt(team.points||0)}</div>
-      <div class="target">${fmt(target)}</div>`;
-    root.appendChild(row);
-  });
-}
+          const esBloqueEquipo =
+            posibleEquipo &&
+            abajoIzq.includes("MES") &&
+            (
+              abajoDer.includes("PUNTAJE") ||
+              abajoDer.includes("PUNTOS") ||
+              abajoDer.includes("OBTENIDO")
+            );
 
-function drawGauge(value,maxValue){
-  const canvas=$("gaugeCanvas"),ctx=canvas.getContext("2d"),w=canvas.width,h=canvas.height;
-  ctx.clearRect(0,0,w,h);
-  const cx=w/2,cy=h-25,rx=w*.42,ry=h*.78,pct=Math.max(0,Math.min(1,maxValue>0?value/maxValue:0));
-  function band(sp,ep,orx,ory,irx,iry,color){
-    const start=Math.PI-Math.PI*sp/100,end=Math.PI-Math.PI*ep/100;ctx.beginPath();
-    for(let i=0;i<=90;i++){const a=start+(end-start)*i/90,x=cx+Math.cos(a)*orx,y=cy-Math.sin(a)*ory;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)}
-    for(let i=90;i>=0;i--){const a=start+(end-start)*i/90,x=cx+Math.cos(a)*irx,y=cy-Math.sin(a)*iry;ctx.lineTo(x,y)}
-    ctx.closePath();ctx.fillStyle=color;ctx.fill();
-  }
-  band(0,100,rx+25,ry+25,rx-125,ry-82,"#dce1e8");ctx.strokeStyle="#4a5563";ctx.lineWidth=5;ctx.stroke();
-  band(0,58,rx,ry,rx-90,ry-55,"#159844");band(58,82,rx,ry,rx-90,ry-55,"#d6c92b");band(82,100,rx,ry,rx-90,ry-55,"#c12a23");
-  for(let i=0;i<=100;i+=2){const a=Math.PI-Math.PI*i/100,major=i%10===0,x1=cx+Math.cos(a)*(rx-8),y1=cy-Math.sin(a)*(ry-8),x2=cx+Math.cos(a)*(rx-(major?42:27)),y2=cy-Math.sin(a)*(ry-(major?30:19));ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.strokeStyle="rgba(15,23,42,.82)";ctx.lineWidth=major?3:1.2;ctx.stroke()}
-  [{text:"0",p:10},{text:String(Math.round(maxValue/2)),p:50},{text:String(maxValue),p:90}].forEach(l=>{const a=Math.PI-Math.PI*l.p/100,x=cx+Math.cos(a)*(rx-130),y=cy-Math.sin(a)*(ry-80);ctx.fillStyle="#111827";ctx.font="900 34px Arial";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(l.text,x,y)});
-  ctx.fillStyle="#111827";ctx.font="900 56px Arial";ctx.textAlign="center";ctx.fillText(fmt(value),cx,cy-95);
-  const na=Math.PI-Math.PI*pct,nx=cx+Math.cos(na)*(rx-75),ny=cy-Math.sin(na)*(ry-50);
-  ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(nx,ny);ctx.strokeStyle="#d22121";ctx.lineWidth=9;ctx.lineCap="round";ctx.stroke();
-  ctx.beginPath();ctx.arc(cx,cy,18,0,Math.PI*2);ctx.fillStyle="#27364a";ctx.fill();ctx.strokeStyle="#e5e7eb";ctx.lineWidth=4;ctx.stroke();
-}
+          if (!esBloqueEquipo) continue;
 
-function downloadExcel(){
-  const data=getStore();
-  const records=Object.values(data);
-  if(records.length===0){alert("No hay datos guardados para descargar.");return;}
+          const equipo = corregirNombreEquipo(posibleEquipo);
+          const valores = {};
 
-  const wb=XLSX.utils.book_new();
-  const resumen=[
-    ["Equipo","Mes","Capitán","P obtenido","Puntos adicionales","Motivo puntos adicionales","Total mes","Máximo","Porcentaje","Observaciones","Actualizado"]
-  ];
-  records.forEach(r=>resumen.push([
-    r.team,r.month,r.captain||"",Number(r.points)||0,Number(r.extra)||0,r.extraReason||"",(Number(r.points)||0)+(Number(r.extra)||0),Number(r.max)||100,
-    (Number(r.max)||100)>0?((Number(r.points)||0)+(Number(r.extra)||0))/(Number(r.max)||100):0,
-    r.observations||"",r.updatedAt||""
-  ]));
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(resumen),"Resumen");
+          for (let r = fila + 2; r < matriz.length; r++) {
+            const mes = normalizarTexto(matriz[r]?.[col]);
+            const puntaje = obtenerNumero(matriz[r]?.[col + 1]);
 
-  const detalle=[["Equipo","Mes","Día",...DAILY_COLS.map(c=>c.label),"Observación"]];
-  records.forEach(r=>{
-    (r.days||[]).forEach(d=>{
-      detalle.push([r.team,r.month,d.day,...DAILY_COLS.map(c=>d[c.key]?1:0),d.note||""]);
-    });
-  });
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(detalle),"Detalle diario");
+            if (!mes) continue;
+            if (mes.includes("TOTAL")) break;
 
-  const ranking=getRankingData();
-  const rankRows=[["Posición","Equipo","Puntos","Meta"]];
-  ranking.ranking.forEach((r,i)=>rankRows.push([i+1,r.name,r.points,ranking.target]));
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rankRows),"Ranking");
+            const mesCanonico = MONTHS.find(m => mes.includes(m));
+            if (mesCanonico) {
+              valores[mesCanonico] = puntaje;
+            }
+          }
 
-  XLSX.writeFile(wb,"guardianes_ehs_datos_cargados.xlsx");
-}
+          equipos.push({
+            equipo,
+            logo: obtenerLogo(equipo),
+            valores
+          });
+        }
+      }
 
-function init(){
-  initSelectors();
-  buildDailyTable();
-  loadCurrent();
-  renderSavedRecords();
-  refreshRanking();
+      return equipos;
+    }
 
-  $("teamSelect").addEventListener("change",loadCurrent);
-  $("monthSelect").addEventListener("change",loadCurrent);
-  ["captainInput","pointsInput","extraInput","extraReasonInput","maxInput","obsInput"].forEach(id=>$(id).addEventListener("input",updateFormKpis));
-  $("btnSave").addEventListener("click",saveCurrent);
-  $("btnNextMonth").addEventListener("click",saveAndNextMonth);
-  $("btnLoadSaved").addEventListener("click",loadCurrent);
-  $("btnClearCurrent").addEventListener("click",clearCurrent);
-  $("btnClearAll").addEventListener("click",clearAll);
-  $("btnFormView").addEventListener("click",()=>showView("form"));
-  $("btnRankingView").addEventListener("click",()=>showView("ranking"));
-  $("btnRefreshRanking").addEventListener("click",refreshRanking);
-  $("rankingMonthMode").addEventListener("change",refreshRanking);
-  $("btnDownload").addEventListener("click",downloadExcel);
-}
-init();
-</script>
+    function unirEquiposDuplicados(equipos) {
+      const mapa = {};
+
+      equipos.forEach(item => {
+        if (!mapa[item.equipo]) {
+          mapa[item.equipo] = {
+            equipo: item.equipo,
+            logo: item.logo,
+            valores: {}
+          };
+        }
+
+        Object.entries(item.valores).forEach(([mes, valor]) => {
+          mapa[item.equipo].valores[mes] = (mapa[item.equipo].valores[mes] || 0) + Number(valor || 0);
+        });
+      });
+
+      return Object.values(mapa);
+    }
+
+    function procesarExcel() {
+      limpiarError();
+
+      const input = document.getElementById("excelInput");
+      const archivo = input.files[0];
+
+      if (!archivo) {
+        mostrarError("Primero debes subir el archivo Excel maestro.");
+        return;
+      }
+
+      const lector = new FileReader();
+
+      lector.onload = function(evento) {
+        try {
+          const datos = new Uint8Array(evento.target.result);
+          const workbook = XLSX.read(datos, { type: "array" });
+
+          const hojaTotal = encontrarHojaTotal(workbook);
+          const hoja = workbook.Sheets[hojaTotal];
+
+          const matriz = XLSX.utils.sheet_to_json(hoja, {
+            header: 1,
+            defval: ""
+          });
+
+          datosEquipos = unirEquiposDuplicados(extraerDatosTotalMarathon(matriz));
+
+          if (!datosEquipos.length) {
+            mostrarError("No se detectaron bloques de equipos. Verifica que la hoja tenga EQUIPO, MES y PUNTAJE OBTENIDO.");
+            return;
+          }
+
+          actualizarRanking();
+
+        } catch (error) {
+          console.error(error);
+          mostrarError("Error leyendo el Excel. Revisa que el archivo no esté dañado y que tenga la hoja Total de marathon.");
+        }
+      };
+
+      lector.readAsArrayBuffer(archivo);
+    }
+
+    function actualizarRanking() {
+      const meses = obtenerMesesSeleccionados();
+      const meta = meses.length * 100;
+
+      const ranking = datosEquipos.map(item => {
+        const total = meses.reduce((suma, mes) => suma + Number(item.valores[mes] || 0), 0);
+
+        return {
+          equipo: item.equipo,
+          logo: item.logo,
+          valores: item.valores,
+          total
+        };
+      }).sort((a, b) => b.total - a.total);
+
+      renderRanking(ranking, meta);
+      actualizarKPIs(ranking, meses);
+      drawGauge(ranking[0]?.total || 0, meta);
+    }
+
+    function renderRanking(ranking, meta) {
+      const contenedor = document.getElementById("ranking");
+
+      if (!ranking.length) {
+        contenedor.innerHTML = `<div class="sin-datos">No hay datos para mostrar.</div>`;
+        return;
+      }
+
+      contenedor.innerHTML = ranking.map((item, index) => {
+        const porcentaje = meta > 0 ? Math.min(100, (item.total / meta) * 100) : 0;
+
+        return `
+          <div class="fila">
+            <div class="posicion">${index + 1}</div>
+
+            <div class="logo">
+              <img src="${item.logo}" alt="${item.equipo}" onerror="this.style.display='none'">
+            </div>
+
+            <div class="barra-equipo">
+              <div class="relleno" style="width:${porcentaje}%"></div>
+              <span class="nombre">${item.equipo}</span>
+            </div>
+
+            <div class="puntos">${redondear(item.total)}</div>
+
+            <div class="meta">${meta}</div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function actualizarKPIs(ranking, meses) {
+      const meta = meses.length * 100;
+      const lider = ranking[0];
+      const puntosLider = lider ? lider.total : 0;
+      const avance = meta > 0 ? (puntosLider / meta) * 100 : 0;
+
+      document.getElementById("kpiMeses").textContent = meses.join(" + ");
+      document.getElementById("kpiMeta").textContent = meta;
+      document.getElementById("kpiLider").textContent = lider && lider.total > 0 ? lider.equipo : "-";
+      document.getElementById("kpiPuntos").textContent = redondear(puntosLider);
+      document.getElementById("kpiAvance").textContent = `${redondear(avance)}%`;
+    }
+
+    function drawGauge(value, target) {
+      const canvas = document.getElementById("gaugeCanvas");
+      const ctx = canvas.getContext("2d");
+
+      const w = canvas.width;
+      const h = canvas.height;
+
+      ctx.clearRect(0, 0, w, h);
+
+      const cx = w / 2;
+      const cy = h * 0.92;
+      const radius = Math.min(w * 0.37, h * 0.86);
+
+      const start = Math.PI;
+      const end = 0;
+
+      const grad = ctx.createLinearGradient(cx - radius, 0, cx + radius, 0);
+      grad.addColorStop(0, "#1fc65a");
+      grad.addColorStop(0.50, "#ffe14f");
+      grad.addColorStop(1, "#e5332e");
+
+      ctx.lineWidth = 55;
+      ctx.lineCap = "butt";
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, start, end, false);
+      ctx.strokeStyle = grad;
+      ctx.stroke();
+
+      ctx.lineWidth = 22;
+      ctx.strokeStyle = "#111827";
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius - 38, start, end, false);
+      ctx.stroke();
+
+      const pct = target > 0 ? Math.max(0, Math.min(1, value / target)) : 0;
+      const ang = start + (end - start) * pct;
+
+      const nx = cx + Math.cos(ang) * (radius - 10);
+      const ny = cy + Math.sin(ang) * (radius - 10);
+
+      ctx.lineWidth = 9;
+      ctx.strokeStyle = "#dc2626";
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(nx, ny);
+      ctx.stroke();
+
+      ctx.fillStyle = "#111827";
+      ctx.beginPath();
+      ctx.arc(cx, cy, 18, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#0b1220";
+      ctx.font = "bold 36px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText(`${redondear(value)} / ${target}`, cx, cy - radius * 0.28);
+    }
+
+    function mostrarError(texto) {
+      document.getElementById("mensajeError").innerHTML = `<div class="error">${texto}</div>`;
+    }
+
+    function limpiarError() {
+      document.getElementById("mensajeError").innerHTML = "";
+    }
+
+    drawGauge(0, 300);
+  </script>
 </body>
 </html>

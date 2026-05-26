@@ -322,6 +322,37 @@
       text-shadow: none;
     }
 
+
+    .pendiente-label {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 4;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      color: #dbeafe;
+      background: rgba(15, 23, 42, .78);
+      padding: 3px 6px;
+      border-radius: 8px;
+      border: 1px solid #93a4bd;
+      text-shadow: none;
+    }
+
+    .barra-equipo.sin-puntos {
+      opacity: .9;
+    }
+
+    .fila {
+      animation: aparecerFila .55s ease both;
+    }
+
+    @keyframes aparecerFila {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
     .nota {
       text-align: center;
       color: #dfe7f4;
@@ -473,6 +504,18 @@
       "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"
     ];
 
+
+    const EQUIPOS_BASE = [
+      { equipo: "1RX", logo: "logos/logo_1rx.png", valores: {} },
+      { equipo: "CAI", logo: "logos/logo_cai.png", valores: {} },
+      { equipo: "CALIDAD", logo: "logos/logo_calidad.png", valores: {} },
+      { equipo: "CND", logo: "logos/logo_cnd.png", valores: {} },
+      { equipo: "LOS 20KG", logo: "logos/logo_los_20kg.png", valores: {} },
+      { equipo: "LOS CIENTIFICOS", logo: "logos/logo_los_cientificos.png", valores: {} },
+      { equipo: "SOLVENTE", logo: "logos/logo_solvente.png", valores: {} },
+      { equipo: "WATER BASE", logo: "logos/logo_water_base.png", valores: {} }
+    ];
+
     const TEAM_LOGOS = {
       "1RX": "logos/logo_1rx.png",
       "CAI": "logos/logo_cai.png",
@@ -484,7 +527,7 @@
       "WATER BASE": "logos/logo_water_base.png"
     };
 
-    let datosEquipos = [];
+    let datosEquipos = EQUIPOS_BASE.map(e => ({ ...e, valores: { ...e.valores } }));
 
     document.getElementById("cantidadMeses").addEventListener("change", () => {
       if (datosEquipos.length) actualizarRanking();
@@ -609,11 +652,19 @@
     function unirEquiposDuplicados(equipos) {
       const mapa = {};
 
+      EQUIPOS_BASE.forEach(item => {
+        mapa[item.equipo] = {
+          equipo: item.equipo,
+          logo: item.logo,
+          valores: {}
+        };
+      });
+
       equipos.forEach(item => {
         if (!mapa[item.equipo]) {
           mapa[item.equipo] = {
             equipo: item.equipo,
-            logo: item.logo,
+            logo: item.logo || obtenerLogo(item.equipo),
             valores: {}
           };
         }
@@ -655,8 +706,8 @@
           datosEquipos = unirEquiposDuplicados(extraerDatosTotalMarathon(matriz));
 
           if (!datosEquipos.length) {
+            datosEquipos = EQUIPOS_BASE.map(e => ({ ...e, valores: { ...e.valores } }));
             mostrarError("No se detectaron bloques de equipos. Verifica que la hoja tenga EQUIPO, MES y PUNTAJE OBTENIDO.");
-            return;
           }
 
           actualizarRanking();
@@ -674,6 +725,9 @@
       const meses = obtenerMesesSeleccionados();
       const meta = meses.length * 100;
 
+      const ordenBase = {};
+      EQUIPOS_BASE.forEach((e, i) => ordenBase[e.equipo] = i);
+
       const ranking = datosEquipos.map(item => {
         const total = meses.reduce((suma, mes) => suma + Number(item.valores[mes] || 0), 0);
 
@@ -683,7 +737,10 @@
           valores: item.valores,
           total
         };
-      }).sort((a, b) => b.total - a.total);
+      }).sort((a, b) => {
+        if (b.total !== a.total) return b.total - a.total;
+        return (ordenBase[a.equipo] ?? 99) - (ordenBase[b.equipo] ?? 99);
+      });
 
       renderRanking(ranking, meta);
       actualizarKPIs(ranking, meses);
@@ -694,14 +751,19 @@
       const contenedor = document.getElementById("ranking");
 
       if (!ranking.length) {
-        contenedor.innerHTML = `<div class="sin-datos">No hay datos para mostrar.</div>`;
-        return;
+        ranking = EQUIPOS_BASE.map(e => ({
+          equipo: e.equipo,
+          logo: e.logo,
+          valores: {},
+          total: 0
+        }));
       }
 
       contenedor.innerHTML = ranking.map((item, index) => {
         const avanceReal = meta > 0 ? (item.total / meta) * 100 : 0;
-        const porcentajeVisual = Math.min(100, avanceReal);
+        const porcentajeVisual = Math.min(100, Math.max(0, avanceReal));
         const tieneExceso = item.total > meta;
+        const sinPuntos = Number(item.total) <= 0;
         const posicionCorredor = tieneExceso
           ? 90
           : Math.max(3, Math.min(88, porcentajeVisual * 0.88));
@@ -714,10 +776,11 @@
               <img src="${item.logo}" alt="${item.equipo}" onerror="this.src='logos/logo_default.png'">
             </div>
 
-            <div class="barra-equipo">
+            <div class="barra-equipo ${sinPuntos ? "sin-puntos" : ""}">
               <div class="relleno" style="width:${porcentajeVisual}%"></div>
               <img class="corredor" src="${item.logo}" alt="${item.equipo}" style="left:${posicionCorredor}%;" onerror="this.src='logos/logo_default.png'">
               ${tieneExceso ? `<span class="exceso-label">EXCESO</span>` : ``}
+              ${sinPuntos ? `<span class="pendiente-label">PENDIENTE</span>` : ``}
               <span class="nombre">${item.equipo}</span>
             </div>
 
@@ -840,7 +903,7 @@
       document.getElementById("mensajeError").innerHTML = "";
     }
 
-    drawGauge(0, 300);
+    actualizarRanking();
   </script>
 </body>
 </html>
